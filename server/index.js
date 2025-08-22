@@ -448,7 +448,7 @@ const initDatabase = async () => {
         expires_at TIMESTAMP NOT NULL,
         status VARCHAR(20) DEFAULT 'active',
         FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (promoted_by) REFERENCES users(id)
+        FOREIGN((promoted_by) REFERENCES users(id)
       )
     `);
 
@@ -562,6 +562,28 @@ const initDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id)
       );
+    `);
+
+    // Create emojis table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS emojis (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        filename VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create friendships table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS friendships (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        friend_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, friend_id)
+      )
     `);
 
     console.log('Database tables initialized successfully');
@@ -1759,7 +1781,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Create room endpoint
-app.post('/api/rooms', async (req, res) => {
+app.post('/api/rooms', (req, res) => {
   console.log('POST /api/rooms -', new Date().toISOString());
   console.log('Headers:', req.headers);
   console.log('Body:', req.body);
@@ -1784,7 +1806,7 @@ app.post('/api/rooms', async (req, res) => {
 
   try {
     // Save room to database
-    const result = await pool.query(`
+    const result = pool.query(`
       INSERT INTO rooms (name, description, managed_by, type, members, max_members, created_by)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
@@ -1964,34 +1986,87 @@ app.get('/api/rooms/:roomId/participants', (req, res) => {
 });
 
 // Friends API endpoints
+// Add friend endpoint
+app.post('/api/friends/add', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { friendId } = req.body;
+
+    console.log(`=== ADD FRIEND REQUEST ===`);
+    console.log(`User ${userId} wants to add friend ${friendId}`);
+
+    if (!friendId) {
+      return res.status(400).json({ error: 'Friend ID is required' });
+    }
+
+    if (userId === friendId) {
+      return res.status(400).json({ error: 'Cannot add yourself as friend' });
+    }
+
+    // Check if friendship already exists
+    const existingFriendship = await pool.query(
+      'SELECT * FROM friendships WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)',
+      [userId, friendId]
+    );
+
+    if (existingFriendship.rows.length > 0) {
+      return res.status(400).json({ error: 'Friendship already exists or pending' });
+    }
+
+    // Check if target user exists
+    const targetUser = await pool.query('SELECT * FROM users WHERE id = $1', [friendId]);
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create friendship (assuming auto-accept for now, you can modify for friend requests)
+    await pool.query(
+      'INSERT INTO friendships (user_id, friend_id, status, created_at) VALUES ($1, $2, $3, NOW())',
+      [userId, friendId, 'accepted']
+    );
+
+    // Also create the reverse relationship
+    await pool.query(
+      'INSERT INTO friendships (user_id, friend_id, status, created_at) VALUES ($1, $2, $3, NOW())',
+      [friendId, userId, 'accepted']
+    );
+
+    console.log(`Friendship created between user ${userId} and ${friendId}`);
+    res.json({ success: true, message: 'Friend added successfully' });
+
+  } catch (error) {
+    console.error('Error adding friend:', error);
+    res.status(500).json({ error: 'Failed to add friend' });
+  }
+});
+
 app.get('/api/friends', authenticateToken, async (req, res) => {
   try {
-    console.log('=== GET FRIENDS REQUEST ===');
-    console.log('Headers:', req.headers);
-    console.log('User ID:', req.user.id);
+    const userId = req.user.userId;
+    console.log('User ID:', userId);
 
-    // Get friends from database
-    const result = await pool.query(`
-      SELECT u.id, u.username, u.avatar, u.verified, u.role, u.exp, u.level
+    // Fetch friends from friendships table
+    const friendsQuery = await pool.query(`
+      SELECT u.id, u.username as name, u.avatar, 
+             CASE WHEN u.last_activity > NOW() - INTERVAL '5 minutes' THEN 'online' ELSE 'offline' END as status,
+             CASE WHEN u.last_activity > NOW() - INTERVAL '5 minutes' THEN 'Active now' 
+                  ELSE 'Last seen ' || EXTRACT(EPOCH FROM (NOW() - u.last_activity))/60 || ' minutes ago' END as lastSeen
       FROM users u
-      JOIN user_follows uf ON u.id = uf.following_id
-      WHERE uf.follower_id = $1
-      ORDER BY u.username
-    `, [req.user.id]);
+      JOIN friendships f ON (f.friend_id = u.id)
+      WHERE f.user_id = $1 AND f.status = 'accepted'
+      ORDER BY u.last_activity DESC
+    `, [userId]);
 
-    const friends = result.rows.map(user => ({
-      id: user.id.toString(),
-      name: user.username,
-      username: user.username,
-      status: 'online', // TODO: implement real status
-      lastSeen: 'Active now', // TODO: implement real last seen
-      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
-      level: user.level || 1,
-      verified: user.verified,
-      role: user.role
+    const friendsData = friendsQuery.rows.map(friend => ({
+      id: friend.id.toString(),
+      name: friend.name,
+      avatar: friend.avatar || friend.name.charAt(0).toUpperCase(),
+      status: friend.status,
+      lastSeen: friend.lastseen
     }));
 
-    res.json(friends);
+    console.log(`Returning ${friendsData.length} friends for user ${userId}`);
+    res.json(friendsData);
   } catch (error) {
     console.error('Error fetching friends:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -3082,7 +3157,7 @@ app.get('/api/lowcard/games', (req, res) => {
     const timestamp = Date.now();
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     let fileExtension = path.extname(filename);
-    
+
     // If no extension, determine from type and content
     if (!fileExtension) {
       if (type === 'video') {
@@ -3091,7 +3166,7 @@ app.get('/api/lowcard/games', (req, res) => {
         fileExtension = '.jpg'; // Default to jpg for photos
       }
     }
-    
+
     const fileId = `file_${timestamp}_${randomSuffix}${fileExtension}`;
     const filePath = path.join(__dirname, 'uploads', 'media', fileId);
 
@@ -3104,18 +3179,18 @@ app.get('/api/lowcard/games', (req, res) => {
     try {
       // Write the base64 data to a file
       fs.writeFileSync(filePath, base64Data, 'base64');
-      
+
       // Verify file was created and has content
       if (!fs.existsSync(filePath)) {
         throw new Error('File was not created successfully');
       }
-      
+
       const stats = fs.statSync(filePath);
       if (stats.size === 0) {
         fs.unlinkSync(filePath); // Remove empty file
         throw new Error('File was created but is empty');
       }
-      
+
       console.log(`File saved successfully: ${fileId}, Size: ${stats.size} bytes`);
     } catch (writeError) {
       console.error('Error writing file:', writeError);
@@ -3266,20 +3341,20 @@ app.get('/api/feed/media/:fileId', (req, res) => {
     } else {
       // Try exact filename match first
       matchingFile = files.find(file => file === fileId);
-      
+
       // If not found, try to match by removing extension from fileId
       if (!matchingFile) {
         const fileIdWithoutExt = fileId.replace(/\.[^/.]+$/, "");
         matchingFile = files.find(file => file.startsWith(fileIdWithoutExt));
         console.log('Searching for files starting with:', fileIdWithoutExt);
       }
-      
+
       // If still not found, try to match the full fileId as prefix
       if (!matchingFile) {
         matchingFile = files.find(file => file.startsWith(fileId.split('.')[0]));
         console.log('Searching for files starting with prefix:', fileId.split('.')[0]);
       }
-      
+
       if (matchingFile) {
         filePath = path.join(mediaDir, matchingFile);
         foundFile = true;
@@ -3324,12 +3399,12 @@ app.get('/api/feed/media/:fileId', (req, res) => {
         const parts = range.replace(/bytes=/, "").split("-");
         const start = parseInt(parts[0], 10);
         const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
-        
+
         // Validate range
         if (start >= stats.size || end >= stats.size || start > end) {
           return res.status(416).json({ error: 'Range not satisfiable' });
         }
-        
+
         const chunksize = (end - start) + 1;
 
         res.status(206);
@@ -3357,15 +3432,12 @@ app.get('/api/feed/media/:fileId', (req, res) => {
     } else {
       console.log(`File not found: ${fileId}`);
       console.log('Searched in directory:', mediaDir);
-      
-      const files = fs.readdirSync(mediaDir);
-      console.log('Available files in media directory:', files.length > 0 ? files : 'No files');
-      
+
       // Check if it's a known missing file and clean up database reference
       if (fileId.includes('file_1755819832061_3xjv6')) {
         console.log('Detected missing file from error, should clean up database reference');
       }
-      
+
       res.status(404).json({ 
         error: 'File not found',
         requestedFile: fileId,
@@ -3568,7 +3640,7 @@ io.on('connection', (socket) => {
       try {
         // Handle both old format (multiple parameters) and new format (single object)
         let roomId, sender, content, role, level, type, gift;
-        
+
         if (typeof messageData === 'object' && messageData.roomId) {
           // New format: single object
           ({ roomId, sender, content, role, level, type, gift } = messageData);
@@ -3788,111 +3860,67 @@ io.on('connection', (socket) => {
 
 
 // Route for creating private chats
-app.post('/api/chat/private', async (req, res) => {
+// Create private chat
+app.post('/api/chat/private', authenticateToken, async (req, res) => {
   try {
-    const { participants, initiatedBy } = req.body;
+    const { targetUserId } = req.body;
+    const currentUserId = req.user.userId;
 
-    console.log('=== CREATE PRIVATE CHAT REQUEST ===');
-    console.log('Participants:', participants);
-    console.log('Initiated by:', initiatedBy);
+    console.log(`Creating private chat between ${currentUserId} and ${targetUserId}`);
 
-    if (!participants || !Array.isArray(participants) || participants.length < 2) {
-      return res.status(400).json({ error: 'At least 2 participants are required' });
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID is required' });
     }
 
-    if (!initiatedBy) {
-      return res.status(400).json({ error: 'InitiatedBy is required' });
+    if (currentUserId === targetUserId) {
+      return res.status(400).json({ error: 'Cannot create chat with yourself' });
     }
 
-    // Filter out duplicate participants and sort for consistent ordering
-    const uniqueParticipants = [...new Set(participants)].sort();
-
-    // Only allow 2 participants for private chat
-    if (uniqueParticipants.length !== 2) {
-      return res.status(400).json({ error: 'Private chat must have exactly 2 participants' });
+    // Check if target user exists
+    const targetUser = await pool.query('SELECT * FROM users WHERE id = $1', [targetUserId]);
+    if (targetUser.rows.length === 0) {
+      return res.status(404).json({ error: 'Target user not found' });
     }
 
-    // Verify that all participants exist in the database
-    const userIds = [];
-    for (const participant of uniqueParticipants) {
-      const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [participant]);
-      if (userResult.rows.length === 0) {
-        return res.status(400).json({ error: `User ${participant} not found` });
-      }
-      userIds.push(userResult.rows[0].id);
-    }
+    // For simplicity, we'll create a room-based private chat using existing room system
+    // Check if private room already exists between these users
+    const existingRoom = await pool.query(
+      `SELECT r.* FROM rooms r 
+       WHERE r.name = $1 OR r.name = $2`,
+      [`private_${currentUserId}_${targetUserId}`, `private_${targetUserId}_${currentUserId}`]
+    );
 
-    // Check if private chat already exists between these two users
-    const existingChatQuery = `
-      SELECT pc.*, array_agg(pcp.username ORDER BY pcp.username) as participants
-      FROM private_chats pc
-      JOIN private_chat_participants pcp ON pc.id = pcp.chat_id
-      WHERE pc.id IN (
-        SELECT chat_id 
-        FROM private_chat_participants 
-        WHERE username = ANY($1)
-        GROUP BY chat_id 
-        HAVING COUNT(*) = 2
-      )
-      GROUP BY pc.id
-      HAVING array_agg(pcp.username ORDER BY pcp.username) = $2
-    `;
-
-    const existingChat = await pool.query(existingChatQuery, [uniqueParticipants, uniqueParticipants]);
-
-    if (existingChat.rows.length > 0) {
-      console.log('Existing private chat found:', existingChat.rows[0]);
-      return res.json({
-        id: existingChat.rows[0].id,
-        type: 'private',
-        participants: existingChat.rows[0].participants,
-        createdBy: existingChat.rows[0].created_by,
-        createdAt: existingChat.rows[0].created_at,
-        messages: [],
-        isExisting: true
+    if (existingRoom.rows.length > 0) {
+      // Room already exists, return existing room
+      return res.json({ 
+        chatId: existingRoom.rows[0].id,
+        message: 'Private chat already exists' 
       });
     }
 
-    // Generate a unique chat ID using UUID-like format
-    const chatId = `private_${userIds.sort().join('_')}_${Date.now()}`;
+    // Create new private room
+    const roomResult = await pool.query(
+      'INSERT INTO rooms (name, description, type, max_members, created_by, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING id',
+      [
+        `private_${currentUserId}_${targetUserId}`,
+        `Private chat between users`,
+        'private',
+        2,
+        currentUserId
+      ]
+    );
 
-    // Create private chat in database
-    const insertChatQuery = `
-      INSERT INTO private_chats (id, created_by, created_at)
-      VALUES ($1, $2, $3)
-      RETURNING *
-    `;
+    const roomId = roomResult.rows[0].id;
 
-    const chatResult = await pool.query(insertChatQuery, [
-      chatId,
-      initiatedBy,
-      new Date()
-    ]);
+    console.log(`Private chat room created with ID: ${roomId}`);
+    res.json({ 
+      chatId: roomId,
+      message: 'Private chat created successfully' 
+    });
 
-    // Add participants to private chat
-    for (const participant of uniqueParticipants) {
-      await pool.query(
-        'INSERT INTO private_chat_participants (chat_id, username) VALUES ($1, $2)',
-        [chatId, participant]
-      );
-    }
-
-    const privateChat = {
-      id: chatId,
-      type: 'private',
-      participants: uniqueParticipants,
-      createdBy: initiatedBy,
-      createdAt: chatResult.rows[0].created_at,
-      messages: [],
-      isExisting: false
-    };
-
-    console.log('Created new private chat:', privateChat);
-
-    res.json(privateChat);
   } catch (error) {
     console.error('Error creating private chat:', error);
-    res.status(500).json({ error: 'Failed to create private chat', details: error.message });
+    res.status(500).json({ error: 'Failed to create private chat' });
   }
 });
 
@@ -4039,14 +4067,14 @@ app.delete('/api/messages/:messageId', authenticateToken, async (req, res) => {
 app.get('/api/debug/media-files', (req, res) => {
   try {
     const mediaDir = path.join(__dirname, 'uploads', 'media');
-    
+
     if (!fs.existsSync(mediaDir)) {
       return res.json({ 
         error: 'Media directory does not exist',
         mediaDir: mediaDir 
       });
     }
-    
+
     const files = fs.readdirSync(mediaDir);
     const fileDetails = files.map(filename => {
       const filePath = path.join(mediaDir, filename);
@@ -4059,7 +4087,7 @@ app.get('/api/debug/media-files', (req, res) => {
         path: filePath
       };
     });
-    
+
     res.json({
       mediaDir: mediaDir,
       totalFiles: files.length,
@@ -4099,7 +4127,7 @@ app.post('/api/admin/cleanup-missing-media', authenticateToken, async (req, res)
           // Extract filename from URL
           const filename = media.url.split('/').pop();
           const filePath = path.join(mediaDir, filename);
-          
+
           if (fs.existsSync(filePath)) {
             hasValidMedia = true;
           } else {

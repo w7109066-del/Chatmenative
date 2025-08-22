@@ -308,6 +308,63 @@ const HomeScreen = ({ navigation }: any) => {
     updateUserStatus(statuses[nextIndex]);
   };
 
+  // Add friend function
+  const addFriend = async (userId: string, username: string) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/friends/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ friendId: userId }),
+      });
+
+      if (response.ok) {
+        Alert.alert('Success', `Friend request sent to ${username}`);
+        // Refresh friends list
+        fetchFriends();
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.error || 'Failed to add friend');
+      }
+    } catch (error) {
+      console.error('Error adding friend:', error);
+      Alert.alert('Error', 'Failed to add friend');
+    }
+  };
+
+  // Start chat function
+  const startChat = async (userId: string, username: string) => {
+    try {
+      const response = await fetch(`${getApiUrl()}/api/chat/private`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+
+      if (response.ok) {
+        const chatData = await response.json();
+        navigation.navigate('Chat', {
+          roomId: chatData.chatId,
+          roomName: `Chat with ${username}`,
+          roomDescription: `Private chat with ${username}`,
+          type: 'private',
+          targetUser: username
+        });
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.error || 'Failed to start chat');
+      }
+    } catch (error) {
+      console.error('Error starting chat:', error);
+      Alert.alert('Error', 'Failed to start chat');
+    }
+  };
+
   const renderFriend = (friend: Friend) => (
     <View key={friend.id} style={styles.friendCard}>
       <View style={styles.friendInfo}>
@@ -326,7 +383,28 @@ const HomeScreen = ({ navigation }: any) => {
           <Text style={styles.friendStatus}>{friend.lastSeen}</Text>
         </View>
       </View>
-      <View style={[styles.statusDot, { backgroundColor: getStatusColor(friend.status) }]} />
+      
+      <View style={styles.actionButtons}>
+        {/* Show action buttons only when searching users (not friends) */}
+        {searchText.length >= 2 ? (
+          <>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => addFriend(friend.id, friend.name)}
+            >
+              <Ionicons name="person-add" size={20} color="#4CAF50" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => startChat(friend.id, friend.name)}
+            >
+              <Ionicons name="chatbubble" size={20} color="#2196F3" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(friend.status) }]} />
+        )}
+      </View>
     </View>
   );
 
@@ -685,6 +763,16 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
   },
   loadingContainer: {
     flex: 1,
