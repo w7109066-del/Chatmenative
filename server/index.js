@@ -448,7 +448,7 @@ const initDatabase = async () => {
         expires_at TIMESTAMP NOT NULL,
         status VARCHAR(20) DEFAULT 'active',
         FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN((promoted_by) REFERENCES users(id)
+        FOREIGN KEY (promoted_by) REFERENCES users(id)
       )
     `);
 
@@ -583,6 +583,19 @@ const initDatabase = async () => {
         status VARCHAR(20) DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(user_id, friend_id)
+      )
+    `);
+
+    // Create user_exp_history table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_exp_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        activity_type VARCHAR(50) NOT NULL,
+        exp_gained INTEGER NOT NULL,
+        new_exp INTEGER NOT NULL,
+        new_level INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
