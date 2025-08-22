@@ -1,1 +1,75 @@
 modules = ["nodejs-20"]
+[nix]
+packages = ["nodejs-18_x"]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Start Full Stack"
+
+[[workflows.workflow]]
+name = "Start Expo"
+author = 46482010
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx expo start --host tunnel"
+
+[[workflows.workflow]]
+name = "Start Expo Tunnel"
+author = 46482010
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx expo start --tunnel"
+
+[[workflows.workflow]]
+name = "Start Expo Tunnel"
+author = 46482010
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx expo start --tunnel"
+
+[[workflows.workflow]]
+name = "Start Full Stack"
+author = 46482010
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd server && npm install && npm start"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx expo start --host tunnel"
+
+[[workflows.workflow]]
+name = "Start Server Only"
+author = 46482010
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd server && npm install && npm start"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3001
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3000
+
+[deployment]
+run = ["sh", "-c", "cd server && npm start"]

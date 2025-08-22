@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Video, ResizeMode } from 'expo-av';
+import Video, { ResizeMode } from 'expo-video';
 import { useAuth } from '../hooks';
 import { useNavigation } from '@react-navigation/native';
 
@@ -60,7 +60,7 @@ interface MediaItem {
 
 // API configuration
 const getApiUrl = () => {
-  return 'https://2b1a8762-7688-43fb-b119-1097a355d8a8-00-2qggmgbre9lxw.pike.replit.dev';
+  return 'https://2968a09a-ea9e-4400-aa61-da927ebc2b19-00-kk2da6734ef9.sisko.replit.dev';
 };
 
 const API_BASE_URL = getApiUrl();
