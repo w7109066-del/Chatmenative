@@ -2102,8 +2102,7 @@ export default function ChatScreen() {
               <View style={styles.emojiPickerContent}>
                 {emojiList.length > 0 ? (
                   <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
                     style={styles.emojiScrollView}
                     contentContainerStyle={styles.emojiScrollContent}
                   >
@@ -2839,7 +2838,8 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   emojiPickerContent: {
-    height: 56, // Reduced height for smaller emojis
+    maxHeight: 200, // Increased height for vertical scrolling
+    minHeight: 140,
   },
   emojiScrollView: {
     flex: 1,
@@ -2847,16 +2847,18 @@ const styles = StyleSheet.create({
   emojiScrollContent: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   emojiItem: {
-    width: 36,
-    height: 36,
-    marginHorizontal: 2,
+    width: 40,
+    height: 40,
+    margin: 4,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#E9ECEF',
   },
