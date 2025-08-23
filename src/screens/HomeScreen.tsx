@@ -466,7 +466,10 @@ const HomeScreen = ({ navigation }: any) => {
         <View style={styles.friendsHeader}>
           <Text style={styles.friendsTitle}>Friends</Text>
           <View style={styles.friendsControls}>
-            <TouchableOpacity style={styles.trophyButton}>
+            <TouchableOpacity 
+              style={styles.trophyButton}
+              onPress={() => navigation.navigate('TopRank')}
+            >
               <Ionicons name="trophy" size={20} color="#FF9800" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.refreshButton} onPress={fetchFriends}>

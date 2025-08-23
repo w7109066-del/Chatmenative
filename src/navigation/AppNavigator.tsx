@@ -28,6 +28,9 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 
 // Import AdminScreen
 import AdminScreen from '../screens/AdminScreen';
+// Import TopRankScreen
+import TopRankScreen from '../screens/TopRankScreen';
+
 
 import { useAuth } from '../hooks';
 
@@ -143,6 +146,12 @@ export default function AppNavigator() {
           <Stack.Screen
             name="TransactionHistory"
             component={TransactionHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          {/* Add TopRank screen to Stack Navigator */}
+          <Stack.Screen
+            name="TopRank"
+            component={TopRankScreen}
             options={{ headerShown: false }}
           />
           {/* Add Notifications screen to Stack Navigator */}

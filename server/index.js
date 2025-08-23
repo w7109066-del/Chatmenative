@@ -4265,6 +4265,235 @@ app.get('/api/feed/posts', async (req, res) => {
 
 
 
+// Rankings endpoints
+app.get('/api/rankings/games', async (req, res) => {
+  try {
+    console.log('Fetching games rankings...');
+    
+    // Get top players by gaming achievements
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.level,
+        u.verified,
+        COALESCE(ua.count, 0) as game_score
+      FROM users u
+      LEFT JOIN user_achievements ua ON u.id = ua.user_id AND ua.achievement_type = 'gaming'
+      ORDER BY game_score DESC, u.level DESC
+      LIMIT 50
+    `);
+
+    const rankings = result.rows.map((user, index) => ({
+      rank: index + 1,
+      id: user.id.toString(),
+      username: user.username,
+      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
+      level: user.level || 1,
+      verified: user.verified || false,
+      score: user.game_score
+    }));
+
+    res.json(rankings);
+  } catch (error) {
+    console.error('Error fetching games rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch games rankings' });
+  }
+});
+
+app.get('/api/rankings/wealth', async (req, res) => {
+  try {
+    console.log('Fetching wealth rankings...');
+    
+    // Get top players by wealth (credits + achievements)
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.level,
+        u.verified,
+        COALESCE(uc.balance, 0) as credits,
+        COALESCE(ua.count, 0) as wealth_achievements
+      FROM users u
+      LEFT JOIN user_credits uc ON u.id = uc.user_id
+      LEFT JOIN user_achievements ua ON u.id = ua.user_id AND ua.achievement_type = 'wealth'
+      ORDER BY credits DESC, wealth_achievements DESC, u.level DESC
+      LIMIT 50
+    `);
+
+    const rankings = result.rows.map((user, index) => ({
+      rank: index + 1,
+      id: user.id.toString(),
+      username: user.username,
+      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
+      level: user.level || 1,
+      verified: user.verified || false,
+      credits: user.credits,
+      wealthScore: user.wealth_achievements
+    }));
+
+    res.json(rankings);
+  } catch (error) {
+    console.error('Error fetching wealth rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch wealth rankings' });
+  }
+});
+
+app.get('/api/rankings/gifts', async (req, res) => {
+  try {
+    console.log('Fetching gifts rankings...');
+    
+    // Get top players by gifts received
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.level,
+        u.verified,
+        COUNT(ug.id) as total_gifts,
+        COALESCE(ua.count, 0) as persona_score
+      FROM users u
+      LEFT JOIN user_gifts ug ON u.id = ug.user_id
+      LEFT JOIN user_achievements ua ON u.id = ua.user_id AND ua.achievement_type = 'persona'
+      GROUP BY u.id, u.username, u.avatar, u.level, u.verified, ua.count
+      ORDER BY total_gifts DESC, persona_score DESC, u.level DESC
+      LIMIT 50
+    `);
+
+    const rankings = result.rows.map((user, index) => ({
+      rank: index + 1,
+      id: user.id.toString(),
+      username: user.username,
+      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
+      level: user.level || 1,
+      verified: user.verified || false,
+      totalGifts: parseInt(user.total_gifts),
+      personaScore: user.persona_score
+    }));
+
+    res.json(rankings);
+  } catch (error) {
+    console.error('Error fetching gifts rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch gifts rankings' });
+  }
+});
+
+// Rankings endpoints without /api prefix for compatibility
+app.get('/rankings/games', async (req, res) => {
+  try {
+    console.log('Fetching games rankings (no /api)...');
+    
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.level,
+        u.verified,
+        COALESCE(ua.count, 0) as game_score
+      FROM users u
+      LEFT JOIN user_achievements ua ON u.id = ua.user_id AND ua.achievement_type = 'gaming'
+      ORDER BY game_score DESC, u.level DESC
+      LIMIT 50
+    `);
+
+    const rankings = result.rows.map((user, index) => ({
+      rank: index + 1,
+      id: user.id.toString(),
+      username: user.username,
+      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
+      level: user.level || 1,
+      verified: user.verified || false,
+      score: user.game_score
+    }));
+
+    res.json(rankings);
+  } catch (error) {
+    console.error('Error fetching games rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch games rankings' });
+  }
+});
+
+app.get('/rankings/wealth', async (req, res) => {
+  try {
+    console.log('Fetching wealth rankings (no /api)...');
+    
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.level,
+        u.verified,
+        COALESCE(uc.balance, 0) as credits,
+        COALESCE(ua.count, 0) as wealth_achievements
+      FROM users u
+      LEFT JOIN user_credits uc ON u.id = uc.user_id
+      LEFT JOIN user_achievements ua ON u.id = ua.user_id AND ua.achievement_type = 'wealth'
+      ORDER BY credits DESC, wealth_achievements DESC, u.level DESC
+      LIMIT 50
+    `);
+
+    const rankings = result.rows.map((user, index) => ({
+      rank: index + 1,
+      id: user.id.toString(),
+      username: user.username,
+      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
+      level: user.level || 1,
+      verified: user.verified || false,
+      credits: user.credits,
+      wealthScore: user.wealth_achievements
+    }));
+
+    res.json(rankings);
+  } catch (error) {
+    console.error('Error fetching wealth rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch wealth rankings' });
+  }
+});
+
+app.get('/rankings/gifts', async (req, res) => {
+  try {
+    console.log('Fetching gifts rankings (no /api)...');
+    
+    const result = await pool.query(`
+      SELECT 
+        u.id, 
+        u.username, 
+        u.avatar, 
+        u.level,
+        u.verified,
+        COUNT(ug.id) as total_gifts,
+        COALESCE(ua.count, 0) as persona_score
+      FROM users u
+      LEFT JOIN user_gifts ug ON u.id = ug.user_id
+      LEFT JOIN user_achievements ua ON u.id = ua.user_id AND ua.achievement_type = 'persona'
+      GROUP BY u.id, u.username, u.avatar, u.level, u.verified, ua.count
+      ORDER BY total_gifts DESC, persona_score DESC, u.level DESC
+      LIMIT 50
+    `);
+
+    const rankings = result.rows.map((user, index) => ({
+      rank: index + 1,
+      id: user.id.toString(),
+      username: user.username,
+      avatar: user.avatar || user.username.charAt(0).toUpperCase(),
+      level: user.level || 1,
+      verified: user.verified || false,
+      totalGifts: parseInt(user.total_gifts),
+      personaScore: user.persona_score
+    }));
+
+    res.json(rankings);
+  } catch (error) {
+    console.error('Error fetching gifts rankings:', error);
+    res.status(500).json({ error: 'Failed to fetch gifts rankings' });
+  }
+});
+
 // Add backward compatibility endpoints without /api prefix
 
 // Friends endpoint without /api prefix
