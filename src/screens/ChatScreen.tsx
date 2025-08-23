@@ -703,8 +703,15 @@ export default function ChatScreen() {
 
   const handleEmojiSelect = (selectedEmoji: any) => {
     if (selectedEmoji.type === 'image' && selectedEmoji.url) {
-      // For image emojis, insert the image URL in a format that can be rendered
-      setMessage(prev => prev + `<img:${selectedEmoji.url}>`);
+      // For image emojis from server, use the server URL
+      if (typeof selectedEmoji.url === 'string' && selectedEmoji.url.startsWith('/')) {
+        setMessage(prev => prev + `<img:${selectedEmoji.url}>`);
+      } else if (typeof selectedEmoji.url === 'number') {
+        // For local image emojis (require() returns a number), use a special format
+        setMessage(prev => prev + `<localimg:${selectedEmoji.name}>`);
+      } else {
+        setMessage(prev => prev + `<img:${selectedEmoji.url}>`);
+      }
     } else if (selectedEmoji.emoji) {
       // For text emojis, use the emoji character
       setMessage(prev => prev + selectedEmoji.emoji);
@@ -918,15 +925,81 @@ export default function ChatScreen() {
   };
 
   const renderMessageContent = (content: string) => {
-    // Split content by image emoji pattern <img:url>
-    const parts = content.split(/(<img:[^>]+>)/g);
+    // Split content by image emoji patterns <img:url> and <localimg:name>
+    const parts = content.split(/(<img:[^>]+>|<localimg:[^>]+>)/g);
+
+    // Map of local emoticon names to their require paths
+    const localEmoticonsMap: { [key: string]: any } = {
+      'Angry Old': require('../../assets/emoticon/angryold.png'),
+      'Annoyed Old': require('../../assets/emoticon/annoyedold.png'),
+      'Bum': require('../../assets/emoticon/bum.png'),
+      'Call Me': require('../../assets/emoticon/callme.png'),
+      'Cheeky Old': require('../../assets/emoticon/cheekyold.png'),
+      'Confused': require('../../assets/emoticon/confused.png'),
+      'Cool Old': require('../../assets/emoticon/coolold.png'),
+      'Cry': require('../../assets/emoticon/cry.png'),
+      'Curious Old': require('../../assets/emoticon/curiousold.png'),
+      'Dies': require('../../assets/emoticon/dies.png'),
+      'Disgust Old': require('../../assets/emoticon/disgustold.png'),
+      'Dizzy': require('../../assets/emoticon/dizzy.png'),
+      'Drooling': require('../../assets/emoticon/drooling.png'),
+      'Err': require('../../assets/emoticon/err.png'),
+      'Football': require('../../assets/emoticon/ffootball.png'),
+      'Football Trophy': require('../../assets/emoticon/ffootballtrophy.png'),
+      'Goal': require('../../assets/emoticon/fgoal.png'),
+      'Goal Post': require('../../assets/emoticon/fgoalpost.png'),
+      'Golden Boot': require('../../assets/emoticon/fgoldenboot.png'),
+      'Hat': require('../../assets/emoticon/fhat.png'),
+      'Flirt': require('../../assets/emoticon/flirt.png'),
+      'Mint': require('../../assets/emoticon/fmint.png'),
+      'Player': require('../../assets/emoticon/fplayer.png'),
+      'Red Boot': require('../../assets/emoticon/fredboot.png'),
+      'Red Card': require('../../assets/emoticon/fredcard.png'),
+      'Red Jersey': require('../../assets/emoticon/fredjersey.png'),
+      'Red Pants': require('../../assets/emoticon/fredpants.png'),
+      'Referee': require('../../assets/emoticon/freferee.png'),
+      'Ring': require('../../assets/emoticon/fring.png'),
+      'Scarf': require('../../assets/emoticon/fscarf.png'),
+      'Silver Ball': require('../../assets/emoticon/fsilverball.png'),
+      'Soccer Toy': require('../../assets/emoticon/fsoccertoy.png'),
+      'Socks': require('../../assets/emoticon/fsocks.png'),
+      'Trophy': require('../../assets/emoticon/ftrophy.png'),
+      'Whistle': require('../../assets/emoticon/fwhistle.png'),
+      'Whistle 2': require('../../assets/emoticon/fwhistle2.png'),
+      'Yellow Card': require('../../assets/emoticon/fyellowcard.png'),
+      'Happy': require('../../assets/emoticon/happy.png'),
+      'Hug Me': require('../../assets/emoticon/hugme.png'),
+      'Hug Me 2': require('../../assets/emoticon/hugme2.png'),
+      'Hypnotized': require('../../assets/emoticon/hypnotized.png'),
+      'Insane': require('../../assets/emoticon/insane.png'),
+      'Kiss Back': require('../../assets/emoticon/kissback.png'),
+      'Kiss Lips': require('../../assets/emoticon/kisslips.png'),
+      'Kiss Me': require('../../assets/emoticon/kissme.png'),
+      'Kiss Old': require('../../assets/emoticon/kissold.png'),
+      'Love': require('../../assets/emoticon/love.png'),
+      'Nerd': require('../../assets/emoticon/nerd.png'),
+      'Sad': require('../../assets/emoticon/sad.png'),
+      'Shocked': require('../../assets/emoticon/shocked.png'),
+      'Shy': require('../../assets/emoticon/shy.png'),
+      'Shy Old': require('../../assets/emoticon/shyold.png'),
+      'Silent': require('../../assets/emoticon/silent.png'),
+      'Sleeping': require('../../assets/emoticon/sleeping.png'),
+      'Sleepy': require('../../assets/emoticon/sleepy.png'),
+      'Speechless': require('../../assets/emoticon/speechless.png'),
+      'Sssh': require('../../assets/emoticon/sssh.png'),
+      'Unimpressed': require('../../assets/emoticon/unimpressed.png'),
+      'Very Happy': require('../../assets/emoticon/veryhappy.png'),
+      'Wink': require('../../assets/emoticon/wink.png'),
+      'Yuck': require('../../assets/emoticon/yuck.png'),
+      'Yum': require('../../assets/emoticon/yum.png'),
+    };
 
     return (
       <View style={styles.messageContentContainer}>
         <Text style={styles.messageContent} numberOfLines={0}>
           {parts.map((part, index) => {
             if (part.startsWith('<img:') && part.endsWith('>')) {
-              // Extract image URL
+              // Extract server image URL
               const imageUrl = part.slice(5, -1);
               return (
                 <Text key={index}>
@@ -937,6 +1010,21 @@ export default function ChatScreen() {
                   />
                 </Text>
               );
+            } else if (part.startsWith('<localimg:') && part.endsWith('>')) {
+              // Extract local image name
+              const imageName = part.slice(10, -1);
+              const localImageSource = localEmoticonsMap[imageName];
+              if (localImageSource) {
+                return (
+                  <Text key={index}>
+                    <Image
+                      source={localImageSource}
+                      style={styles.inlineEmojiImage}
+                      resizeMode="contain"
+                    />
+                  </Text>
+                );
+              }
             }
             return part;
           })}
@@ -1057,9 +1145,163 @@ export default function ChatScreen() {
     );
   };
 
-  // Function to load emojis from the admin API
+  // Function to load emojis from the admin API and local assets
   const loadEmojis = async () => {
     try {
+      // Local emoticons from assets/emoticon
+      const localEmoticons = [
+        { emoji: '😀', type: 'text', name: 'Grinning Face' },
+        { emoji: '😂', type: 'text', name: 'Face with Tears of Joy' },
+        { emoji: '🥰', type: 'text', name: 'Smiling Face with Hearts' },
+        { emoji: '😊', type: 'text', name: 'Smiling Face with Smiling Eyes' },
+        { emoji: '😍', type: 'text', name: 'Smiling Face with Heart-Eyes' },
+        { emoji: '😘', type: 'text', name: 'Kiss' },
+        { emoji: '😗', type: 'text', name: 'Kissing Face' },
+        { emoji: '😙', type: 'text', name: 'Kissing Face with Smiling Eyes' },
+        { emoji: '😚', type: 'text', name: 'Kissing Face with Closed Eyes' },
+        { emoji: '🙂', type: 'text', name: 'Slightly Smiling Face' },
+        { emoji: '🤗', type: 'text', name: 'Hugging Face' },
+        { emoji: '🤩', type: 'text', name: 'Star-Struck' },
+        { emoji: '🤔', type: 'text', name: 'Thinking Face' },
+        { emoji: '🤨', type: 'text', name: 'Face with Raised Eyebrow' },
+        { emoji: '😐', type: 'text', name: 'Neutral Face' },
+        { emoji: '😑', type: 'text', name: 'Expressionless Face' },
+        { emoji: '🙄', type: 'text', name: 'Face with Rolling Eyes' },
+        { emoji: '😏', type: 'text', name: 'Smirking Face' },
+        { emoji: '😣', type: 'text', name: 'Persevering Face' },
+        { emoji: '😥', type: 'text', name: 'Sad but Relieved Face' },
+        { emoji: '😮', type: 'text', name: 'Face with Open Mouth' },
+        { emoji: '🤐', type: 'text', name: 'Zipper-Mouth Face' },
+        { emoji: '😯', type: 'text', name: 'Hushed Face' },
+        { emoji: '😪', type: 'text', name: 'Sleepy Face' },
+        { emoji: '😫', type: 'text', name: 'Tired Face' },
+        { emoji: '🥱', type: 'text', name: 'Yawning Face' },
+        { emoji: '😴', type: 'text', name: 'Sleeping Face' },
+        { emoji: '😌', type: 'text', name: 'Relieved Face' },
+        { emoji: '😛', type: 'text', name: 'Face with Tongue' },
+        { emoji: '😜', type: 'text', name: 'Winking Face with Tongue' },
+        { emoji: '😝', type: 'text', name: 'Squinting Face with Tongue' },
+        { emoji: '🤤', type: 'text', name: 'Drooling Face' },
+        { emoji: '😒', type: 'text', name: 'Unamused Face' },
+        { emoji: '😓', type: 'text', name: 'Downcast Face with Sweat' },
+        { emoji: '😔', type: 'text', name: 'Pensive Face' },
+        { emoji: '😕', type: 'text', name: 'Confused Face' },
+        { emoji: '🙃', type: 'text', name: 'Upside-Down Face' },
+        { emoji: '🤑', type: 'text', name: 'Money-Mouth Face' },
+        { emoji: '😲', type: 'text', name: 'Astonished Face' },
+        { emoji: '☹️', type: 'text', name: 'Frowning Face' },
+        { emoji: '🙁', type: 'text', name: 'Slightly Frowning Face' },
+        { emoji: '😖', type: 'text', name: 'Confounded Face' },
+        { emoji: '😞', type: 'text', name: 'Disappointed Face' },
+        { emoji: '😟', type: 'text', name: 'Worried Face' },
+        { emoji: '😤', type: 'text', name: 'Face with Steam From Nose' },
+        { emoji: '😢', type: 'text', name: 'Crying Face' },
+        { emoji: '😭', type: 'text', name: 'Loudly Crying Face' },
+        { emoji: '😦', type: 'text', name: 'Frowning Face with Open Mouth' },
+        { emoji: '😧', type: 'text', name: 'Anguished Face' },
+        { emoji: '😨', type: 'text', name: 'Fearful Face' },
+        { emoji: '😩', type: 'text', name: 'Weary Face' },
+        { emoji: '🤯', type: 'text', name: 'Exploding Head' },
+        { emoji: '😬', type: 'text', name: 'Grimacing Face' },
+        { emoji: '😰', type: 'text', name: 'Anxious Face with Sweat' },
+        { emoji: '😱', type: 'text', name: 'Face Screaming in Fear' },
+        { emoji: '🥵', type: 'text', name: 'Hot Face' },
+        { emoji: '🥶', type: 'text', name: 'Cold Face' },
+        { emoji: '😳', type: 'text', name: 'Flushed Face' },
+        { emoji: '🤪', type: 'text', name: 'Zany Face' },
+        { emoji: '😵', type: 'text', name: 'Dizzy Face' },
+        { emoji: '🥴', type: 'text', name: 'Woozy Face' },
+        { emoji: '😠', type: 'text', name: 'Angry Face' },
+        { emoji: '😡', type: 'text', name: 'Pouting Face' },
+        { emoji: '🤬', type: 'text', name: 'Face with Symbols on Mouth' },
+        { emoji: '😷', type: 'text', name: 'Face with Medical Mask' },
+        { emoji: '🤒', type: 'text', name: 'Face with Thermometer' },
+        { emoji: '🤕', type: 'text', name: 'Face with Head-Bandage' },
+        { emoji: '🤢', type: 'text', name: 'Nauseated Face' },
+        { emoji: '🤮', type: 'text', name: 'Face Vomiting' },
+        { emoji: '🤧', type: 'text', name: 'Sneezing Face' },
+        { emoji: '😇', type: 'text', name: 'Smiling Face with Halo' },
+        { emoji: '🤠', type: 'text', name: 'Cowboy Hat Face' },
+        { emoji: '🥳', type: 'text', name: 'Partying Face' },
+        { emoji: '🥺', type: 'text', name: 'Pleading Face' },
+        { emoji: '🤡', type: 'text', name: 'Clown Face' },
+        { emoji: '🤥', type: 'text', name: 'Lying Face' },
+        { emoji: '🤫', type: 'text', name: 'Shushing Face' },
+        { emoji: '🤭', type: 'text', name: 'Face with Hand Over Mouth' },
+        { emoji: '😈', type: 'text', name: 'Smiling Face with Horns' },
+        { emoji: '👿', type: 'text', name: 'Angry Face with Horns' },
+        { emoji: '👹', type: 'text', name: 'Ogre' },
+        { emoji: '👺', type: 'text', name: 'Goblin' },
+        { emoji: '💀', type: 'text', name: 'Skull' },
+        { emoji: '☠️', type: 'text', name: 'Skull and Crossbones' },
+        { emoji: '👻', type: 'text', name: 'Ghost' },
+        { emoji: '👽', type: 'text', name: 'Alien' },
+        { emoji: '🤖', type: 'text', name: 'Robot' },
+        // Add local emoticons from assets
+        { url: require('../../assets/emoticon/angryold.png'), type: 'image', name: 'Angry Old' },
+        { url: require('../../assets/emoticon/annoyedold.png'), type: 'image', name: 'Annoyed Old' },
+        { url: require('../../assets/emoticon/bum.png'), type: 'image', name: 'Bum' },
+        { url: require('../../assets/emoticon/callme.png'), type: 'image', name: 'Call Me' },
+        { url: require('../../assets/emoticon/cheekyold.png'), type: 'image', name: 'Cheeky Old' },
+        { url: require('../../assets/emoticon/confused.png'), type: 'image', name: 'Confused' },
+        { url: require('../../assets/emoticon/coolold.png'), type: 'image', name: 'Cool Old' },
+        { url: require('../../assets/emoticon/cry.png'), type: 'image', name: 'Cry' },
+        { url: require('../../assets/emoticon/curiousold.png'), type: 'image', name: 'Curious Old' },
+        { url: require('../../assets/emoticon/dies.png'), type: 'image', name: 'Dies' },
+        { url: require('../../assets/emoticon/disgustold.png'), type: 'image', name: 'Disgust Old' },
+        { url: require('../../assets/emoticon/dizzy.png'), type: 'image', name: 'Dizzy' },
+        { url: require('../../assets/emoticon/drooling.png'), type: 'image', name: 'Drooling' },
+        { url: require('../../assets/emoticon/err.png'), type: 'image', name: 'Err' },
+        { url: require('../../assets/emoticon/ffootball.png'), type: 'image', name: 'Football' },
+        { url: require('../../assets/emoticon/ffootballtrophy.png'), type: 'image', name: 'Football Trophy' },
+        { url: require('../../assets/emoticon/fgoal.png'), type: 'image', name: 'Goal' },
+        { url: require('../../assets/emoticon/fgoalpost.png'), type: 'image', name: 'Goal Post' },
+        { url: require('../../assets/emoticon/fgoldenboot.png'), type: 'image', name: 'Golden Boot' },
+        { url: require('../../assets/emoticon/fhat.png'), type: 'image', name: 'Hat' },
+        { url: require('../../assets/emoticon/flirt.png'), type: 'image', name: 'Flirt' },
+        { url: require('../../assets/emoticon/fmint.png'), type: 'image', name: 'Mint' },
+        { url: require('../../assets/emoticon/fplayer.png'), type: 'image', name: 'Player' },
+        { url: require('../../assets/emoticon/fredboot.png'), type: 'image', name: 'Red Boot' },
+        { url: require('../../assets/emoticon/fredcard.png'), type: 'image', name: 'Red Card' },
+        { url: require('../../assets/emoticon/fredjersey.png'), type: 'image', name: 'Red Jersey' },
+        { url: require('../../assets/emoticon/fredpants.png'), type: 'image', name: 'Red Pants' },
+        { url: require('../../assets/emoticon/freferee.png'), type: 'image', name: 'Referee' },
+        { url: require('../../assets/emoticon/fring.png'), type: 'image', name: 'Ring' },
+        { url: require('../../assets/emoticon/fscarf.png'), type: 'image', name: 'Scarf' },
+        { url: require('../../assets/emoticon/fsilverball.png'), type: 'image', name: 'Silver Ball' },
+        { url: require('../../assets/emoticon/fsoccertoy.png'), type: 'image', name: 'Soccer Toy' },
+        { url: require('../../assets/emoticon/fsocks.png'), type: 'image', name: 'Socks' },
+        { url: require('../../assets/emoticon/ftrophy.png'), type: 'image', name: 'Trophy' },
+        { url: require('../../assets/emoticon/fwhistle.png'), type: 'image', name: 'Whistle' },
+        { url: require('../../assets/emoticon/fwhistle2.png'), type: 'image', name: 'Whistle 2' },
+        { url: require('../../assets/emoticon/fyellowcard.png'), type: 'image', name: 'Yellow Card' },
+        { url: require('../../assets/emoticon/happy.png'), type: 'image', name: 'Happy' },
+        { url: require('../../assets/emoticon/hugme.png'), type: 'image', name: 'Hug Me' },
+        { url: require('../../assets/emoticon/hugme2.png'), type: 'image', name: 'Hug Me 2' },
+        { url: require('../../assets/emoticon/hypnotized.png'), type: 'image', name: 'Hypnotized' },
+        { url: require('../../assets/emoticon/insane.png'), type: 'image', name: 'Insane' },
+        { url: require('../../assets/emoticon/kissback.png'), type: 'image', name: 'Kiss Back' },
+        { url: require('../../assets/emoticon/kisslips.png'), type: 'image', name: 'Kiss Lips' },
+        { url: require('../../assets/emoticon/kissme.png'), type: 'image', name: 'Kiss Me' },
+        { url: require('../../assets/emoticon/kissold.png'), type: 'image', name: 'Kiss Old' },
+        { url: require('../../assets/emoticon/love.png'), type: 'image', name: 'Love' },
+        { url: require('../../assets/emoticon/nerd.png'), type: 'image', name: 'Nerd' },
+        { url: require('../../assets/emoticon/sad.png'), type: 'image', name: 'Sad' },
+        { url: require('../../assets/emoticon/shocked.png'), type: 'image', name: 'Shocked' },
+        { url: require('../../assets/emoticon/shy.png'), type: 'image', name: 'Shy' },
+        { url: require('../../assets/emoticon/shyold.png'), type: 'image', name: 'Shy Old' },
+        { url: require('../../assets/emoticon/silent.png'), type: 'image', name: 'Silent' },
+        { url: require('../../assets/emoticon/sleeping.png'), type: 'image', name: 'Sleeping' },
+        { url: require('../../assets/emoticon/sleepy.png'), type: 'image', name: 'Sleepy' },
+        { url: require('../../assets/emoticon/speechless.png'), type: 'image', name: 'Speechless' },
+        { url: require('../../assets/emoticon/sssh.png'), type: 'image', name: 'Sssh' },
+        { url: require('../../assets/emoticon/unimpressed.png'), type: 'image', name: 'Unimpressed' },
+        { url: require('../../assets/emoticon/veryhappy.png'), type: 'image', name: 'Very Happy' },
+        { url: require('../../assets/emoticon/wink.png'), type: 'image', name: 'Wink' },
+        { url: require('../../assets/emoticon/yuck.png'), type: 'image', name: 'Yuck' },
+        { url: require('../../assets/emoticon/yum.png'), type: 'image', name: 'Yum' },
+      ];
+
       console.log('Loading emojis from:', `${API_BASE_URL}/api/emojis`);
       const response = await fetch(`${API_BASE_URL}/api/emojis`, {
         method: 'GET',
@@ -1069,29 +1311,35 @@ export default function ChatScreen() {
         },
       });
 
+      let serverEmojis = [];
       if (response.ok) {
-        const emojiData = await response.json();
-        setEmojiList(emojiData);
-        console.log('Emojis loaded:', emojiData.length);
+        serverEmojis = await response.json();
+        console.log('Server emojis loaded:', serverEmojis.length);
       } else {
-        console.error('Failed to load emojis');
-        setEmojiList([
-          { emoji: '😀', type: 'text', name: 'Grinning Face' },
-          { emoji: '😂', type: 'text', name: 'Face with Tears of Joy' },
-          { emoji: '🥰', type: 'text', name: 'Smiling Face with Hearts' },
-          { emoji: '😊', type: 'text', name: 'Smiling Face with Smiling Eyes' },
-          { emoji: '😍', type: 'text', name: 'Smiling Face with Heart-Eyes' },
-        ]);
+        console.error('Failed to load server emojis');
       }
+
+      // Combine local emoticons with server emojis
+      const allEmojis = [...localEmoticons, ...serverEmojis];
+      setEmojiList(allEmojis);
+      console.log('Total emojis loaded:', allEmojis.length);
     } catch (error) {
       console.error('Error loading emojis:', error);
-      setEmojiList([
+      // Fallback to just local emoticons if server fails
+      const localEmoticons = [
         { emoji: '😀', type: 'text', name: 'Grinning Face' },
         { emoji: '😂', type: 'text', name: 'Face with Tears of Joy' },
         { emoji: '🥰', type: 'text', name: 'Smiling Face with Hearts' },
         { emoji: '😊', type: 'text', name: 'Smiling Face with Smiling Eyes' },
         { emoji: '😍', type: 'text', name: 'Smiling Face with Heart-Eyes' },
-      ]);
+        // Add some local emoticons as fallback
+        { url: require('../../assets/emoticon/happy.png'), type: 'image', name: 'Happy' },
+        { url: require('../../assets/emoticon/sad.png'), type: 'image', name: 'Sad' },
+        { url: require('../../assets/emoticon/wink.png'), type: 'image', name: 'Wink' },
+        { url: require('../../assets/emoticon/love.png'), type: 'image', name: 'Love' },
+        { url: require('../../assets/emoticon/cry.png'), type: 'image', name: 'Cry' },
+      ];
+      setEmojiList(localEmoticons);
     }
   };
 
@@ -1867,8 +2115,12 @@ export default function ChatScreen() {
                       >
                         {emoji.type === 'text' ? (
                           <Text style={styles.emojiText}>{emoji.emoji}</Text>
+                        ) : emoji.type === 'image' && typeof emoji.url === 'string' ? (
+                          <Image source={{ uri: `${API_BASE_URL}${emoji.url}` }} style={styles.emojiImage} />
+                        ) : emoji.type === 'image' && typeof emoji.url === 'number' ? (
+                          <Image source={emoji.url} style={styles.emojiImage} />
                         ) : (
-                          <Image source={{ uri: emoji.url }} style={styles.emojiImage} />
+                          <Text style={styles.emojiText}>🙂</Text>
                         )}
                       </TouchableOpacity>
                     ))}
