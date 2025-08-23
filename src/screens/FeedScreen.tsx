@@ -16,9 +16,16 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import Video from 'expo-video';
 import { useAuth } from '../hooks';
 import { useNavigation } from '@react-navigation/native';
+
+// Import Video with error handling
+let Video: any = null;
+try {
+  Video = require('expo-video').default;
+} catch (error) {
+  console.warn('expo-video not available:', error);
+}
 
 interface Comment {
   id: string;
@@ -588,28 +595,35 @@ export default function FeedScreen() {
     fetchPosts();
   }, []);
 
-  const renderPost = (post: FeedPost) => (
-    <View key={post.id} style={[styles.postCard, { backgroundColor: getRoleBackgroundColor(post.role) }]}>
-      <View style={styles.postHeader}>
-        <TouchableOpacity 
-          style={styles.avatarContainer}
-          onPress={() => handleUserClick(post)}
-        >
-          <View style={[styles.avatar, { borderColor: getRoleColor(post.role), borderWidth: 2 }]}>
-            {post.avatar && post.avatar.startsWith('http') ? (
-              <Image 
-                source={{ uri: post.avatar }} 
-                style={styles.avatarImage}
-                onError={() => console.log('Avatar failed to load:', post.avatar)}
-              />
-            ) : (
-              <Text style={styles.avatarText}>
-                {post.avatar || post.username?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            )}
-          </View>
-          <View style={styles.onlineIndicator} />
-        </TouchableOpacity>
+  const renderPost = (post: FeedPost) => {
+    // Safety check for post object
+    if (!post || !post.id) {
+      console.warn('Invalid post object:', post);
+      return null;
+    }
+
+    return (
+      <View key={post.id} style={[styles.postCard, { backgroundColor: getRoleBackgroundColor(post.role) }]}>
+        <View style={styles.postHeader}>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={() => handleUserClick(post)}
+          >
+            <View style={[styles.avatar, { borderColor: getRoleColor(post.role), borderWidth: 2 }]}>
+              {post.avatar && post.avatar.startsWith('http') ? (
+                <Image 
+                  source={{ uri: post.avatar }} 
+                  style={styles.avatarImage}
+                  onError={() => console.log('Avatar failed to load:', post.avatar)}
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {post.avatar || post.username?.charAt(0)?.toUpperCase() || 'U'}
+                </Text>
+              )}
+            </View>
+            <View style={styles.onlineIndicator} />
+          </TouchableOpacity>
         <View style={styles.postInfo}>
           <TouchableOpacity onPress={() => handleUserClick(post)}>
             <View style={styles.userInfo}>
@@ -634,55 +648,62 @@ export default function FeedScreen() {
       </View>
 
       {/* Media Files */}
-      {post.mediaFiles && post.mediaFiles.length > 0 && (
+      {post.mediaFiles && Array.isArray(post.mediaFiles) && post.mediaFiles.length > 0 && (
         <View style={styles.mediaContainer}>
-          {post.mediaFiles.map((media, index) => (
-            <View key={media.id || index} style={styles.mediaItem}>
-              {media.type === 'photo' ? (
-                <Image
-                  source={{ uri: media.url }}
-                  style={styles.postImage}
-                  resizeMode="cover"
-                  onError={(error) => {
-                    console.log('Image failed to load:', media.url, error);
-                  }}
-                />
-              ) : media.type === 'video' ? (
-                <TouchableOpacity style={styles.videoContainer} onPress={() => {
-                  // Check if video URL is valid
-                  if (media.url && media.url !== '/api/feed/media/undefined' && !media.url.includes('undefined')) {
-                    console.log('Opening video:', media.url);
-                    console.log('Media filename:', media.filename);
-                    console.log('Media ID:', media.id);
-                    
-                    // Construct full URL if needed
-                    const fullVideoUrl = media.url.startsWith('http') 
-                      ? media.url 
-                      : `${API_BASE_URL}${media.url}`;
-                    
-                    console.log('Full video URL:', fullVideoUrl);
-                    setSelectedVideoUrl(fullVideoUrl);
-                    setShowVideoModal(true);
-                  } else {
-                    console.log('Invalid video URL:', media.url);
-                    Alert.alert('Error', 'Video file not found or corrupted');
-                  }
-                }}>
-                  <View style={styles.videoThumbnail}>
-                    <Ionicons name="play-circle" size={50} color="#fff" />
-                    <Text style={styles.videoPlayText}>Tap to play</Text>
-                  </View>
-                  <View style={styles.videoInfo}>
-                    <Text style={styles.videoTitle}>Video</Text>
-                    <Text style={styles.videoFilename}>{media.filename}</Text>
-                    <Text style={styles.videoStatus}>
-                      {media.url && media.url !== '/api/feed/media/undefined' ? 'Ready' : 'Processing...'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ))}
+          {post.mediaFiles.map((media, index) => {
+            // Ensure media object exists and has required properties
+            if (!media || !media.type || !media.url) {
+              return null;
+            }
+
+            return (
+              <View key={media.id || `media-${index}`} style={styles.mediaItem}>
+                {media.type === 'photo' ? (
+                  <Image
+                    source={{ uri: media.url }}
+                    style={styles.postImage}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      console.log('Image failed to load:', media.url, error);
+                    }}
+                  />
+                ) : media.type === 'video' ? (
+                  <TouchableOpacity style={styles.videoContainer} onPress={() => {
+                    // Check if video URL is valid
+                    if (media.url && media.url !== '/api/feed/media/undefined' && !media.url.includes('undefined')) {
+                      console.log('Opening video:', media.url);
+                      console.log('Media filename:', media.filename);
+                      console.log('Media ID:', media.id);
+                      
+                      // Construct full URL if needed
+                      const fullVideoUrl = media.url.startsWith('http') 
+                        ? media.url 
+                        : `${API_BASE_URL}${media.url}`;
+                      
+                      console.log('Full video URL:', fullVideoUrl);
+                      setSelectedVideoUrl(fullVideoUrl);
+                      setShowVideoModal(true);
+                    } else {
+                      console.log('Invalid video URL:', media.url);
+                      Alert.alert('Error', 'Video file not found or corrupted');
+                    }
+                  }}>
+                    <View style={styles.videoThumbnail}>
+                      <Ionicons name="play-circle" size={50} color="#fff" />
+                      <Text style={styles.videoPlayText}>Tap to play</Text>
+                    </View>
+                    <View style={styles.videoInfo}>
+                      <Text style={styles.videoTitle}>Video</Text>
+                      <Text style={styles.videoFilename}>{media.filename || 'Video file'}</Text>
+                      <Text style={styles.videoStatus}>
+                        {media.url && media.url !== '/api/feed/media/undefined' ? 'Ready' : 'Processing...'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -721,7 +742,8 @@ export default function FeedScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -898,7 +920,7 @@ export default function FeedScreen() {
               </TouchableOpacity>
             </View>
             
-            {selectedVideoUrl && (
+            {selectedVideoUrl && Video && (
               <Video
                 ref={videoRef}
                 style={styles.videoPlayer}
@@ -912,25 +934,17 @@ export default function FeedScreen() {
                   console.error('Video URL that failed:', selectedVideoUrl);
                   
                   let errorMessage = 'Failed to play video.';
-                  let shouldTryDifferentUrl = false;
                   
                   if (error && error.error) {
                     const errorStr = error.error.toString();
                     if (errorStr.includes('FileNotFoundException') || errorStr.includes('ENOENT')) {
                       errorMessage = 'Video file not found on server. The file may have been moved or deleted.';
-                      shouldTryDifferentUrl = true;
                     } else if (errorStr.includes('Network')) {
                       errorMessage = 'Network error while loading video. Please check your internet connection.';
                     } else {
                       errorMessage = `Video playback error: ${errorStr}`;
                     }
                   }
-                  
-                  console.log('Error details:', {
-                    error,
-                    selectedVideoUrl,
-                    shouldTryDifferentUrl
-                  });
                   
                   Alert.alert('Video Error', errorMessage, [
                     {
@@ -949,6 +963,11 @@ export default function FeedScreen() {
                   console.log('Video loading started for:', selectedVideoUrl);
                 }}
               />
+            )}
+            {selectedVideoUrl && !Video && (
+              <View style={[styles.videoPlayer, { justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ color: '#fff', fontSize: 16 }}>Video player not available</Text>
+              </View>
             )}
           </View>
         </View>
