@@ -2272,8 +2272,8 @@ const styles = StyleSheet.create({
   },
   messageRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    flexWrap: 'nowrap',
   },
   messageBadgesRow: {
     flexDirection: 'row',
@@ -2314,7 +2314,9 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 11,
     color: '#999',
-    marginLeft: 'auto',
+    marginLeft: 8,
+    alignSelf: 'flex-start',
+    marginTop: -2,
   },
   messageContentContainer: {
     marginTop: 2,
@@ -2323,11 +2325,13 @@ const styles = StyleSheet.create({
   messageContentInline: {
     flex: 1,
     marginRight: 8,
+    marginTop: -2,
   },
   messageContent: {
     fontSize: 14,
     color: '#333',
     lineHeight: 20,
+    textAlign: 'left',
   },
   inlineEmojiImage: {
     width: 18,
