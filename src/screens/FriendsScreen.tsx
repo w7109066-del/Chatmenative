@@ -48,6 +48,34 @@ export default function FriendsScreen() {
     }
   };
 
+  const formatLastSeen = (lastSeen?: string) => {
+    if (!lastSeen) return 'Active now';
+    
+    // If it's already a formatted string like "3 minutes ago", return as is
+    if (lastSeen.includes('ago') || lastSeen.includes('Active') || lastSeen.includes('Recently')) {
+      return lastSeen;
+    }
+    
+    // Try to parse as a date
+    const lastSeenDate = new Date(lastSeen);
+    if (isNaN(lastSeenDate.getTime())) {
+      return 'Recently';
+    }
+    
+    const now = new Date();
+    const diffMs = now.getTime() - lastSeenDate.getTime();
+    const diffMinutes = Math.floor(diffMs / 1000 / 60);
+
+    if (diffMinutes < 1) return 'Active now';
+    if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+    if (diffMinutes < 1440) {
+      const hours = Math.floor(diffMinutes / 60);
+      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    }
+    const days = Math.floor(diffMinutes / 1440);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  };
+
   const fetchFriends = async () => {
     if (!user?.username || !authToken) return;
 
@@ -181,14 +209,16 @@ export default function FriendsScreen() {
             <Image source={{ uri: friend.avatar }} style={styles.friendAvatar} />
           ) : (
             <View style={[styles.friendAvatar, { backgroundColor: friend.status === 'online' ? '#FF6B6B' : '#9E9E9E' }]}>
-              <Text style={styles.friendAvatarText}>{friend.avatar}</Text>
+              <Text style={styles.friendAvatarText}>
+                {friend.avatar || friend.name?.charAt(0).toUpperCase() || 'U'}
+              </Text>
             </View>
           )}
           <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(friend.status) }]} />
         </View>
         <View style={styles.friendDetails}>
           <Text style={styles.friendName}>{friend.name}</Text>
-          <Text style={styles.friendStatus}>{friend.lastSeen}</Text>
+          <Text style={styles.friendStatus}>{formatLastSeen(friend.lastSeen)}</Text>
         </View>
       </View>
       
