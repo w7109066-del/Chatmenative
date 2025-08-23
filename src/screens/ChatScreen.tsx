@@ -245,7 +245,7 @@ export default function ChatScreen() {
                 msg.id === newMessage.id || 
                 (msg.sender === newMessage.sender && msg.content === newMessage.content && msg.id.startsWith('temp_'))
               );
-              
+
               let updatedMessages;
               if (existingIndex !== -1) {
                 // Replace optimistic message with real message
@@ -258,7 +258,7 @@ export default function ChatScreen() {
                   msg.content === newMessage.content &&
                   Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 2000
                 );
-                
+
                 if (!isDuplicate) {
                   updatedMessages = [...tab.messages, newMessage];
                 } else {
@@ -272,7 +272,7 @@ export default function ChatScreen() {
                   flatListRefs.current[tab.id]?.scrollToEnd({ animated: true });
                 }, 30);
               }
-              
+
               return { ...tab, messages: updatedMessages };
             }
             return tab;
@@ -540,7 +540,7 @@ export default function ChatScreen() {
       const currentTab = chatTabs[activeTab];
       const isPrivateChat = currentTab.type === 'private';
       const messageContent = message.trim();
-      
+
       // Create optimistic message object
       const optimisticMessage = {
         id: `temp_${Date.now()}_${user.username}`,
@@ -827,7 +827,7 @@ export default function ChatScreen() {
       Alert.alert('Success', `${selectedParticipant?.username} has been unblocked`);
     } else {
       setBlockedUsers(prev => [...prev, selectedParticipant?.username]);
-      Alert.alert('Success', `${selectedParticipant?.username} has been blocked. You won't see their messages.`);
+      Alert.alert('Success', `${selectedParticipant?.username} has been blocked. You won\'t see their messages.`);
     }
   };
 
@@ -1143,8 +1143,34 @@ export default function ChatScreen() {
 
       const currentRoomId = chatTabs[activeTab].id;
       const isPrivateChat = chatTabs[activeTab].type === 'private';
+      
+      // For private chats, gifts are sent via sendMessage with a special flag
+      if (isPrivateChat) {
+        if (socket) {
+          socket.emit('sendMessage', currentRoomId, `🎁 Gift: ${gift.name} ${gift.icon}`, user.username, true);
+        }
+        // Add to local messages as a notification
+        const notificationMessage: Message = {
+          id: `gift_noti_${Date.now()}_${user.username}`,
+          sender: 'System',
+          content: `You sent ${gift.name} ${gift.icon} to ${targetUser?.username || 'the other participant'}`,
+          timestamp: new Date(),
+          roomId: currentRoomId,
+          type: 'gift'
+        };
+        setChatTabs(prevTabs =>
+          prevTabs.map(tab =>
+            tab.id === currentRoomId
+              ? { ...tab, messages: [...tab.messages, notificationMessage] }
+              : tab
+          )
+        );
+        setShowGiftPicker(false);
+        Alert.alert('Gift Sent!', `You sent ${gift.name} ${gift.icon} for ${gift.price} credits`);
+        return;
+      }
 
-      // Show gift animation immediately
+      // Show gift animation immediately for public rooms
       setActiveGiftAnimation({
         ...gift,
         sender: user.username,
@@ -1156,7 +1182,7 @@ export default function ChatScreen() {
         setActiveGiftAnimation(null);
       }, 3000);
 
-      // Send gift message via socket
+      // Send gift message via socket for public rooms
       if (socket) {
         const giftMessage = {
           roomId: currentRoomId,
@@ -1168,33 +1194,28 @@ export default function ChatScreen() {
           role: user.role || 'user',
           level: user.level || 1
         };
-
-        if (isPrivateChat) {
-          socket.emit('sendMessage', currentRoomId, `🎁 Gift: ${gift.name} ${gift.icon}`, null, true);
-        } else {
-          socket.emit('send-message', giftMessage);
-        }
-
-        // Add gift message to local state
-        const newMessage: Message = {
-          id: `gift_${Date.now()}_${user.username}`,
-          sender: user.username,
-          content: `🎁 sent a ${gift.name} ${gift.icon}`,
-          timestamp: new Date(),
-          roomId: currentRoomId,
-          role: user.role || 'user',
-          level: user.level || 1,
-          type: 'gift'
-        };
-
-        setChatTabs(prevTabs =>
-          prevTabs.map(tab =>
-            tab.id === currentRoomId
-              ? { ...tab, messages: [...tab.messages, newMessage] }
-              : tab
-          )
-        );
+        socket.emit('send-message', giftMessage);
       }
+
+      // Add gift message to local state for public rooms
+      const newMessage: Message = {
+        id: `gift_${Date.now()}_${user.username}`,
+        sender: user.username,
+        content: `🎁 sent a ${gift.name} ${gift.icon}`,
+        timestamp: new Date(),
+        roomId: currentRoomId,
+        role: user.role || 'user',
+        level: user.level || 1,
+        type: 'gift'
+      };
+
+      setChatTabs(prevTabs =>
+        prevTabs.map(tab =>
+          tab.id === currentRoomId
+            ? { ...tab, messages: [...tab.messages, newMessage] }
+            : tab
+        )
+      );
 
       setShowGiftPicker(false);
       Alert.alert('Gift Sent!', `You sent ${gift.name} ${gift.icon} for ${gift.price} credits`);
@@ -2039,15 +2060,54 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#666',
+    color: '#333',
     marginTop: 20,
-    marginBottom: 10,
+    textAlign: 'center',
   },
   emptyStateSubtitle: {
     fontSize: 16,
-    color: '#999',
+    color: '#666',
+    marginTop: 10,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+  privateChatHistory: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  privateChatSection: {
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  emptyPrivateChats: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyPrivateChatsText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 15,
+  },
+  emptyPrivateChatsSubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  actionSection: {
+    padding: 20,
+    paddingTop: 0,
   },
   header: {
     paddingTop: 10,
@@ -3037,5 +3097,66 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     marginTop: 2,
+  },
+  // Added styles for private chat history display when no rooms are active
+  userListContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  userGiftItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  userGiftInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  userGiftName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  selfLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 8,
+  },
+  giftAnimationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  giftAnimationContainer: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  giftAnimationIcon: {
+    fontSize: 48,
+    marginRight: 16,
+  },
+  giftAnimationInfo: {
+    flex: 1,
+  },
+  giftAnimationText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+    flexShrink: 1,
   },
 });

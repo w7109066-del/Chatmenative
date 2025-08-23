@@ -70,7 +70,10 @@ export default function RoomScreen() {
 
       const data = await response.json();
       console.log('Rooms data received:', data);
-      setRooms(data);
+      
+      // Filter out private rooms (rooms that start with 'private_')
+      const publicRooms = data.filter((room: Room) => !room.name.startsWith('private_'));
+      setRooms(publicRooms);
     } catch (error) {
       console.error('Error fetching rooms:', error);
       Alert.alert('Error', 'Failed to load rooms. Please try again.');
