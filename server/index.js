@@ -2614,9 +2614,34 @@ app.post('/api/users/:userId/avatar', async (req, res) => {
     const { avatar, filename } = req.body;
 
     console.log('Avatar upload request for user:', userId);
+    console.log('Filename:', filename);
+    console.log('Avatar data length:', avatar ? avatar.length : 0);
 
     if (!avatar || !filename) {
       return res.status(400).json({ error: 'Avatar data and filename are required' });
+    }
+
+    // Validate base64 data
+    let cleanBase64 = avatar;
+    if (avatar.startsWith('data:')) {
+      const base64Match = avatar.match(/^data:[^;]+;base64,(.+)$/);
+      if (base64Match) {
+        cleanBase64 = base64Match[1];
+      } else {
+        return res.status(400).json({ error: 'Invalid base64 data format' });
+      }
+    }
+
+    // Test if base64 is valid
+    try {
+      const testBuffer = Buffer.from(cleanBase64, 'base64');
+      if (testBuffer.length === 0) {
+        return res.status(400).json({ error: 'Empty image data' });
+      }
+      console.log('Base64 validation successful, buffer size:', testBuffer.length);
+    } catch (base64Error) {
+      console.error('Base64 validation failed:', base64Error);
+      return res.status(400).json({ error: 'Invalid base64 data' });
     }
 
     // Check if user exists in database
@@ -2625,8 +2650,7 @@ app.post('/api/users/:userId/avatar', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // In a real app, you would save the file to disk or cloud storage
-    // For now, we'll simulate by storing the data in memory
+    // Generate unique avatar ID
     const avatarId = `avatar_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const avatarUrl = `/api/users/avatar/${avatarId}`;
 
@@ -2634,13 +2658,16 @@ app.post('/api/users/:userId/avatar', async (req, res) => {
     if (!global.avatars) {
       global.avatars = {};
     }
+    
     global.avatars[avatarId] = {
       id: avatarId,
       filename,
-      data: avatar, // base64 data
+      data: cleanBase64, // Clean base64 data without data URL prefix
       uploadedBy: userId,
       uploadedAt: new Date().toISOString()
     };
+
+    console.log(`Avatar stored in memory with ID: ${avatarId}`);
 
     // Update user avatar in database
     await pool.query('UPDATE users SET avatar = $1 WHERE id = $2', [avatarUrl, userId]);
@@ -2661,24 +2688,40 @@ app.post('/api/users/:userId/avatar', async (req, res) => {
 app.get('/api/users/avatar/:avatarId', (req, res) => {
   try {
     const { avatarId } = req.params;
+    console.log(`Serving avatar: ${avatarId}`);
 
     if (!global.avatars || !global.avatars[avatarId]) {
+      console.log(`Avatar not found in memory: ${avatarId}`);
       return res.status(404).json({ error: 'Avatar not found' });
     }
 
     const avatar = global.avatars[avatarId];
-    const buffer = Buffer.from(avatar.data, 'base64');
+    console.log(`Avatar found: ${avatar.filename}, data length: ${avatar.data.length}`);
 
-    let contentType = 'image/jpeg';
-    if (avatar.filename.toLowerCase().includes('png')) {
-      contentType = 'image/png';
-    } else if (avatar.filename.toLowerCase().includes('gif')) {
-      contentType = 'image/gif';
+    try {
+      const buffer = Buffer.from(avatar.data, 'base64');
+      console.log(`Buffer created, size: ${buffer.length} bytes`);
+
+      let contentType = 'image/jpeg';
+      if (avatar.filename.toLowerCase().includes('png')) {
+        contentType = 'image/png';
+      } else if (avatar.filename.toLowerCase().includes('gif')) {
+        contentType = 'image/gif';
+      } else if (avatar.filename.toLowerCase().includes('webp')) {
+        contentType = 'image/webp';
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', buffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.setHeader('Content-Disposition', `inline; filename="${avatar.filename}"`);
+      
+      console.log(`Sending avatar with content-type: ${contentType}`);
+      res.send(buffer);
+    } catch (bufferError) {
+      console.error('Error creating buffer from base64:', bufferError);
+      return res.status(500).json({ error: 'Invalid image data' });
     }
-
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${avatar.filename}"`);
-    res.send(buffer);
   } catch (error) {
     console.error('Error serving avatar:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -3281,6 +3324,12 @@ app.get('/uploads/emojis/:filename', (req, res) => {
     console.error('Error serving emoji file:', error);
     res.status(500).json({ error: 'Error serving emoji file' });
   }
+});
+
+// Serve avatar files without /api prefix (backward compatibility)
+app.get('/users/avatar/:avatarId', (req, res) => {
+  // Redirect to the API endpoint
+  res.redirect(301, `/api/users/avatar/${req.params.avatarId}`);
 });
 
 // Serve uploaded gift files
