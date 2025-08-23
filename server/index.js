@@ -3652,11 +3652,11 @@ io.on('connection', (socket) => {
   socket.on('sendMessage', async (messageData) => {
       try {
         // Handle both old format (multiple parameters) and new format (single object)
-        let roomId, sender, content, role, level, type, gift;
+        let roomId, sender, content, role, level, type, gift, tempId;
 
         if (typeof messageData === 'object' && messageData.roomId) {
           // New format: single object
-          ({ roomId, sender, content, role, level, type, gift } = messageData);
+          ({ roomId, sender, content, role, level, type, gift, tempId } = messageData);
         } else {
           // Old format: multiple parameters
           roomId = messageData;
@@ -3711,8 +3711,11 @@ io.on('connection', (socket) => {
           return; // Don't broadcast as regular message
         }
 
+        // Create message with unique ID (use tempId if provided for optimistic updates)
+        const messageId = tempId ? tempId.replace('temp_', '') + '_confirmed' : `${Date.now()}_${sender}_${Math.random().toString(36).substr(2, 9)}`;
+        
         const newMessage = {
-          id: `${Date.now()}_${sender}`,
+          id: messageId,
           sender,
           content,
           timestamp: new Date(),
@@ -3723,16 +3726,18 @@ io.on('connection', (socket) => {
           gift: gift || null
         };
 
-        // Save message to database for persistent storage
-        try {
-          await saveChatMessage(roomId, sender, content, gift ? JSON.stringify(gift) : null, type, role, level, false);
-        } catch (dbError) {
-          console.error('Error saving message to database:', dbError);
-        }
-
-        // Broadcast to ALL users in the room (including sender)
+        // Broadcast to ALL users in the room IMMEDIATELY (prioritize speed)
         io.to(roomId).emit('new-message', newMessage);
-        console.log(`Message broadcasted to room ${roomId} from ${sender}`);
+        console.log(`Message broadcasted immediately to room ${roomId} from ${sender}`);
+
+        // Save to database asynchronously (don't wait for it to complete)
+        setImmediate(async () => {
+          try {
+            await saveChatMessage(roomId, sender, content, gift ? JSON.stringify(gift) : null, type, role, level, false);
+          } catch (dbError) {
+            console.error('Error saving message to database (async):', dbError);
+          }
+        });
 
         // If it's a gift, also broadcast the animation event
         if (type === 'gift' && gift) {

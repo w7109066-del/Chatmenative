@@ -240,19 +240,40 @@ export default function ChatScreen() {
         setChatTabs(prevTabs =>
           prevTabs.map(tab => {
             if (tab.id === newMessage.roomId) {
-              // Check if message already exists to prevent duplicates
-              const messageExists = tab.messages.some(msg => msg.id === newMessage.id);
-              if (!messageExists) {
-                const updatedMessages = [...tab.messages, newMessage];
-                // Auto-scroll if enabled and user is not actively scrolling
-                if (autoScrollEnabled && !isUserScrolling) {
-                  // Use a slight delay to ensure FlatList has updated
-                  setTimeout(() => {
-                    flatListRefs.current[tab.id]?.scrollToEnd({ animated: true });
-                  }, 100);
+              // Replace optimistic message if it exists, otherwise add new message
+              const existingIndex = tab.messages.findIndex(msg => 
+                msg.id === newMessage.id || 
+                (msg.sender === newMessage.sender && msg.content === newMessage.content && msg.id.startsWith('temp_'))
+              );
+              
+              let updatedMessages;
+              if (existingIndex !== -1) {
+                // Replace optimistic message with real message
+                updatedMessages = [...tab.messages];
+                updatedMessages[existingIndex] = { ...newMessage };
+              } else {
+                // Check for duplicates by content and sender (avoid double messages)
+                const isDuplicate = tab.messages.some(msg => 
+                  msg.sender === newMessage.sender && 
+                  msg.content === newMessage.content &&
+                  Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 2000
+                );
+                
+                if (!isDuplicate) {
+                  updatedMessages = [...tab.messages, newMessage];
+                } else {
+                  return tab; // Don't update if duplicate
                 }
-                return { ...tab, messages: updatedMessages };
               }
+
+              // Auto-scroll immediately for better UX
+              if (autoScrollEnabled && !isUserScrolling && newMessage.roomId === chatTabs[activeTab]?.id) {
+                setTimeout(() => {
+                  flatListRefs.current[tab.id]?.scrollToEnd({ animated: true });
+                }, 30);
+              }
+              
+              return { ...tab, messages: updatedMessages };
             }
             return tab;
           })
@@ -519,31 +540,48 @@ export default function ChatScreen() {
       const currentTab = chatTabs[activeTab];
       const isPrivateChat = currentTab.type === 'private';
       const messageContent = message.trim();
+      
+      // Create optimistic message object
+      const optimisticMessage = {
+        id: `temp_${Date.now()}_${user.username}`,
+        sender: user.username,
+        content: messageContent,
+        timestamp: new Date(),
+        roomId: currentRoomId,
+        role: user.role || 'user',
+        level: user.level || 1,
+        type: 'message'
+      };
 
-      // Clear message immediately to prevent double send
+      // Clear message immediately
       setMessage('');
 
-      if (isPrivateChat) {
-        // For private chats, emit first then add to UI
-        socket.emit('sendMessage', {
-          roomId: currentRoomId,
-          sender: user.username,
-          content: messageContent,
-          role: user.role || 'user',
-          level: user.level || 1,
-          type: 'message'
-        });
-      } else {
-        // For room chats, emit the message to broadcast to all users
-        socket.emit('sendMessage', {
-          roomId: currentRoomId,
-          sender: user.username,
-          content: messageContent,
-          role: user.role || 'user',
-          level: user.level || 1,
-          type: 'message'
-        });
-      }
+      // Add message optimistically to UI first (instant feedback)
+      setChatTabs(prevTabs =>
+        prevTabs.map(tab => 
+          tab.id === currentRoomId
+            ? { ...tab, messages: [...tab.messages, optimisticMessage] }
+            : tab
+        )
+      );
+
+      // Auto-scroll immediately
+      setTimeout(() => {
+        flatListRefs.current[currentRoomId]?.scrollToEnd({ animated: true });
+      }, 50);
+
+      // Then emit to server
+      const messageData = {
+        roomId: currentRoomId,
+        sender: user.username,
+        content: messageContent,
+        role: user.role || 'user',
+        level: user.level || 1,
+        type: 'message',
+        tempId: optimisticMessage.id // Include temp ID for replacement
+      };
+
+      socket.emit('sendMessage', messageData);
     }
   };
 
