@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import Video, { ResizeMode } from 'expo-video';
+import Video from 'expo-video';
 import { useAuth } from '../hooks';
 import { useNavigation } from '@react-navigation/native';
 
@@ -904,7 +904,7 @@ export default function FeedScreen() {
                 style={styles.videoPlayer}
                 source={{ uri: selectedVideoUrl }}
                 useNativeControls
-                resizeMode={ResizeMode.CONTAIN}
+                resizeMode="contain"
                 isLooping={false}
                 shouldPlay={true}
                 onError={(error) => {
