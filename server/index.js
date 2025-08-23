@@ -2061,13 +2061,13 @@ app.get('/api/friends', authenticateToken, async (req, res) => {
     // Fetch friends from friendships table
     const friendsQuery = await pool.query(`
       SELECT u.id, u.username as name, u.avatar, 
-             CASE WHEN u.last_activity > NOW() - INTERVAL '5 minutes' THEN 'online' ELSE 'offline' END as status,
-             CASE WHEN u.last_activity > NOW() - INTERVAL '5 minutes' THEN 'Active now' 
-                  ELSE 'Last seen ' || EXTRACT(EPOCH FROM (NOW() - u.last_activity))/60 || ' minutes ago' END as lastSeen
+             CASE WHEN u.last_login > NOW() - INTERVAL '5 minutes' THEN 'online' ELSE 'offline' END as status,
+             CASE WHEN u.last_login > NOW() - INTERVAL '5 minutes' THEN 'Active now' 
+                  ELSE 'Last seen ' || COALESCE(EXTRACT(EPOCH FROM (NOW() - u.last_login))/60, 0) || ' minutes ago' END as lastSeen
       FROM users u
       JOIN friendships f ON (f.friend_id = u.id)
       WHERE f.user_id = $1 AND f.status = 'accepted'
-      ORDER BY u.last_activity DESC
+      ORDER BY u.last_login DESC NULLS LAST
     `, [userId]);
 
     const friendsData = friendsQuery.rows.map(friend => ({
