@@ -7,10 +7,28 @@ import {
   ScrollView,
   Switch,
   Image,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks';
+
+// Use different API URLs for web and mobile
+const getApiUrl = () => {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.location) {
+      const currentHost = window.location.host;
+      const protocol = window.location.protocol;
+      if (currentHost && currentHost.includes('replit.dev')) {
+        return `${protocol}//${currentHost.replace(':3000', ':5000')}`;
+      }
+    }
+    return 'https://934cad12-b01b-4e03-a1f9-4b83b3925e05-00-1t8gilzoxt242.pike.replit.dev:5000';
+  }
+  return 'https://934cad12-b01b-4e03-a1f9-4b83b3925e05-00-1t8gilzoxt242.pike.replit.dev';
+};
+
+const API_BASE_URL = getApiUrl();
 
 export default function SettingsScreen({ navigation }: any) {
   const { user, logout } = useAuth();
@@ -23,7 +41,12 @@ export default function SettingsScreen({ navigation }: any) {
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             {user?.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
+              <Image 
+                source={{ 
+                  uri: user.avatar.startsWith('http') ? user.avatar : `${API_BASE_URL}${user.avatar}` 
+                }} 
+                style={styles.avatarImage} 
+              />
             ) : (
               <Text style={styles.avatarText}>
                 {user?.username?.charAt(0).toUpperCase() || 'U'}
