@@ -563,8 +563,7 @@ export default function FeedScreen() {
           navigation.navigate('Profile', { userId: foundUser.id });
         } else {
           // If user not found in search, use username as ID for mock data
-          navigation.navigate('Profile', { 
-            userId: post.username === 'bob_al' ? '1' : post.user || post.username,
+          navigation.navigate('Profile', { userId: post.username === 'bob_al' ? '1' : post.user || post.username,
             username: post.username 
           });
         }
@@ -747,7 +746,7 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Activity Feed</Text>
+      <Text style={styles.title}>Moment</Text>
 
       <ScrollView 
         style={styles.scrollView} 

@@ -179,7 +179,7 @@ export default function ChatScreen() {
 
       // Only add participant to room if it's not a private chat
       if (user?.username && type !== 'private') {
-        await addParticipantToRoom(roomId, user.username, user.role || 'user');
+        await addParticipantToRoom(roomId, user.username, user?.role || 'user');
       }
 
       // Join room via socket (for both room and private chat)
@@ -2129,7 +2129,7 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   roomNameHighlight: {
-    color: '#229c93',
+    color: '#d6510f',
     fontWeight: 'bold',
   },
   tabContainer: {
