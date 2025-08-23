@@ -383,7 +383,7 @@ const HomeScreen = ({ navigation }: any) => {
           <Text style={styles.friendStatus}>{friend.lastSeen}</Text>
         </View>
       </View>
-      
+
       <View style={styles.actionButtons}>
         {/* Show action buttons only when searching users (not friends) */}
         {searchText.length >= 2 ? (
@@ -466,9 +466,12 @@ const HomeScreen = ({ navigation }: any) => {
         <View style={styles.friendsHeader}>
           <Text style={styles.friendsTitle}>Friends</Text>
           <View style={styles.friendsControls}>
-            <TouchableOpacity style={styles.trophyButton}>
-              <Ionicons name="trophy" size={20} color="#FF9800" />
-            </TouchableOpacity>
+            <TouchableOpacity 
+            style={styles.trophyButton}
+            onPress={() => navigation.navigate('TopRank')}
+          >
+            <Ionicons name="trophy" size={20} color="#FF9800" />
+          </TouchableOpacity>
             <TouchableOpacity style={styles.refreshButton} onPress={fetchFriends}>
               <Ionicons name="refresh" size={20} color="#9C27B0" />
               <Text style={styles.refreshText}>Refresh</Text>

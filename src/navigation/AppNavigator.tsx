@@ -28,6 +28,8 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 
 // Import AdminScreen
 import AdminScreen from '../screens/AdminScreen';
+// Import TopRankScreen
+import TopRankScreen from '../screens/TopRankScreen';
 
 import { useAuth } from '../hooks';
 
@@ -173,6 +175,11 @@ export default function AppNavigator() {
           <Stack.Screen
             name="Room"
             component={RoomScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="TopRank"
+            component={TopRankScreen}
             options={{ headerShown: false }}
           />
         </>
