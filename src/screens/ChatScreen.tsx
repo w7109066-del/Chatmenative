@@ -1008,22 +1008,20 @@ export default function ChatScreen() {
     // Regular message
     return (
       <View style={styles.messageContainer}>
-        <View style={styles.messageHeader}>
-          <View style={styles.messageBadgesRow}>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
-            </View>
-            <Text style={[
-              styles.senderName,
-              { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
-            ]}>
-              {item.sender}
-            </Text>
-            <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+        <View style={styles.messageRow}>
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
           </View>
-        </View>
-        <View style={styles.messageContentContainer}>
-          {renderMessageContent(item.content)}
+          <Text style={[
+            styles.senderName,
+            { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+          ]}>
+            {item.sender}:
+          </Text>
+          <View style={styles.messageContentInline}>
+            {renderMessageContent(item.content)}
+          </View>
+          <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
         </View>
       </View>
     );
@@ -2272,8 +2270,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 16,
   },
-  messageHeader: {
-    marginBottom: 2,
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
   },
   messageBadgesRow: {
     flexDirection: 'row',
@@ -2285,7 +2285,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    marginRight: 4,
+    marginRight: 6,
     minWidth: 32,
     alignItems: 'center',
   },
@@ -2309,7 +2309,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 8,
+    marginRight: 6,
   },
   messageTime: {
     fontSize: 11,
@@ -2319,6 +2319,10 @@ const styles = StyleSheet.create({
   messageContentContainer: {
     marginTop: 2,
     paddingLeft: 0,
+  },
+  messageContentInline: {
+    flex: 1,
+    marginRight: 8,
   },
   messageContent: {
     fontSize: 14,
