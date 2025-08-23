@@ -73,13 +73,15 @@ export default function ChatScreen() {
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [mutedUsers, setMutedUsers] = useState<string[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const [isUserScrolling, setIsUserScrolling] = useState(false); // Track if user is manually scrolling
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [giftList, setGiftList] = useState<any[]>([]);
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<any>(null);
   const [showUserGiftPicker, setShowUserGiftPicker] = useState(false);
   const [selectedGiftForUser, setSelectedGiftForUser] = useState<any>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ScrollView>(null); // Ref for the main ScrollView containing tabs
+  const flatListRefs = useRef<Record<string, FlatList<Message> | null>>({}); // Refs for each FlatList in tabs
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true); // State for auto-scroll toggle
   const { user } = useAuth();
 
   // Get room data from navigation params
@@ -241,7 +243,15 @@ export default function ChatScreen() {
               // Check if message already exists to prevent duplicates
               const messageExists = tab.messages.some(msg => msg.id === newMessage.id);
               if (!messageExists) {
-                return { ...tab, messages: [...tab.messages, newMessage] };
+                const updatedMessages = [...tab.messages, newMessage];
+                // Auto-scroll if enabled and user is not actively scrolling
+                if (autoScrollEnabled && !isUserScrolling) {
+                  // Use a slight delay to ensure FlatList has updated
+                  setTimeout(() => {
+                    flatListRefs.current[tab.id]?.scrollToEnd({ animated: true });
+                  }, 100);
+                }
+                return { ...tab, messages: updatedMessages };
               }
             }
             return tab;
@@ -336,7 +346,7 @@ export default function ChatScreen() {
         socket.off('gift-animation');
       };
     }
-  }, [socket]);
+  }, [socket, autoScrollEnabled, isUserScrolling]); // Include dependencies that affect auto-scroll
 
   const loadRooms = async () => {
     try {
@@ -779,7 +789,7 @@ export default function ChatScreen() {
       Alert.alert('Success', `${selectedParticipant?.username} has been unblocked`);
     } else {
       setBlockedUsers(prev => [...prev, selectedParticipant?.username]);
-      Alert.alert('Success', `${selectedParticipant?.username} has been blocked. You won\'t see their messages.`);
+      Alert.alert('Success', `${selectedParticipant?.username} has been blocked. You won't see their messages.`);
     }
   };
 
@@ -1221,18 +1231,13 @@ export default function ChatScreen() {
     }
   };
 
-  // Modified useEffect to include loadEmojis and loadGifts
-  useEffect(() => {
-    loadParticipants(); // Ensure participants are loaded if roomId is present
-    loadEmojis(); // Load emojis when the component mounts or roomId changes
-    loadGifts(); // Load gifts when the component mounts or roomId changes
-  }, [roomId]); // Dependency array includes roomId to reload data if needed
-
   // Effect to load initial messages and participants when component mounts or roomId changes
   useEffect(() => {
     if (roomId) {
       loadParticipants();
     }
+    loadEmojis(); // Load emojis when the component mounts or roomId changes
+    loadGifts(); // Load gifts when the component mounts or roomId changes
   }, [roomId]);
 
 
@@ -1400,16 +1405,35 @@ export default function ChatScreen() {
             {chatTabs.map((tab, index) => (
               <View key={tab.id} style={styles.tabContent}>
                 <FlatList
+                  ref={(ref) => { flatListRefs.current[tab.id] = ref; }} // Assign ref to the FlatList
                   data={tab.messages}
                   renderItem={renderMessage}
                   keyExtractor={(item) => item.id}
                   style={styles.messagesList}
                   contentContainerStyle={styles.messagesContainer}
                   scrollEnabled={true}
+                  onScroll={({ nativeEvent }) => {
+                    // Check if user is scrolling manually
+                    const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+                    const isScrolledToBottom = contentOffset.y + layoutMeasurement.height >= contentSize.height - 50; // Threshold for "at bottom"
+                    setIsUserScrolling(!isScrolledToBottom);
+                  }}
+                  maintainVisibleContentPosition={{ minIndexForVisible: 0 }} // Optimization for FlatList
                 />
               </View>
             ))}
           </ScrollView>
+          {/* Auto Scroll Toggle Button */}
+          <TouchableOpacity
+            style={styles.autoScrollButton}
+            onPress={() => setAutoScrollEnabled(!autoScrollEnabled)}
+          >
+            <Ionicons
+              name={autoScrollEnabled ? "arrow-down-circle" : "arrow-down-circle-outline"}
+              size={30}
+              color="white"
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Message Input */}
@@ -2951,5 +2975,29 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFD700',
     marginLeft: 2,
+  },
+  // Auto scroll button styles
+  autoScrollButton: {
+    position: 'absolute',
+    bottom: 120, // Adjusted position to be above the input field
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#8B5CF6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    zIndex: 10,
+  },
+  // Styles for userGiftRole, etc.
+  userGiftRole: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
   },
 });
