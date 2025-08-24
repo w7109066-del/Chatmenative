@@ -834,7 +834,7 @@ export default function ChatScreen() {
       Alert.alert('Success', `${selectedParticipant?.username} has been unblocked`);
     } else {
       setBlockedUsers(prev => [...prev, selectedParticipant?.username]);
-      Alert.alert('Success', `${selectedParticipant?.username} has been blocked. You won\'t see their messages.`);
+      Alert.alert('Success', `${selectedParticipant?.username} has been blocked. You won't see their messages.`);
     }
   };
 
@@ -1086,7 +1086,9 @@ export default function ChatScreen() {
             </View>
             <View style={styles.giftMessageContent}>
               <Ionicons name="gift" size={20} color="#FF69B4" />
-              <Text style={styles.giftMessageText}>{item.content}</Text>
+              <View style={styles.giftMessageInline}>
+                <Text style={styles.giftInlineText}>{item.content}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -1389,7 +1391,7 @@ export default function ChatScreen() {
 
       const currentRoomId = chatTabs[activeTab].id;
       const isPrivateChat = chatTabs[activeTab].type === 'private';
-      
+
       // For private chats, gifts are sent via sendMessage with a special flag
       if (isPrivateChat) {
         if (socket) {
