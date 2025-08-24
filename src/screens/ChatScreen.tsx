@@ -1097,15 +1097,17 @@ export default function ChatScreen() {
     return (
       <View style={styles.messageContainer}>
         <View style={styles.messageRow}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
+          <View style={styles.leftSection}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
+            </View>
+            <Text style={[
+              styles.senderName,
+              { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+            ]}>
+              {item.sender}:
+            </Text>
           </View>
-          <Text style={[
-            styles.senderName,
-            { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
-          ]}>
-            {item.sender}:
-          </Text>
           <View style={styles.messageContentInline}>
             {renderMessageContent(item.content)}
           </View>
@@ -2519,12 +2521,17 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     marginBottom: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
   },
   messageRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
   messageBadgesRow: {
     flexDirection: 'row',
@@ -2534,10 +2541,10 @@ const styles = StyleSheet.create({
   levelBadge: {
     backgroundColor: '#229c93',
     borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginRight: 6,
-    minWidth: 32,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    marginRight: 4,
+    minWidth: 30,
     alignItems: 'center',
   },
   levelText: {
@@ -2560,7 +2567,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 6,
+    marginRight: 4,
   },
   messageTime: {
     fontSize: 11,
@@ -2576,7 +2583,6 @@ const styles = StyleSheet.create({
   messageContentInline: {
     flex: 1,
     marginRight: 8,
-    marginTop: -2,
   },
   messageContent: {
     fontSize: 14,
