@@ -56,10 +56,27 @@ export default function FriendsScreen() {
       return lastSeen;
     }
     
-    // Handle numeric values (likely minutes)
+    // Handle very long numeric values (likely milliseconds or large numbers)
     const numericValue = parseFloat(lastSeen);
     if (!isNaN(numericValue)) {
-      const minutes = Math.round(numericValue);
+      let minutes = numericValue;
+      
+      // If it's a very large number, assume it's milliseconds since epoch
+      if (numericValue > 1000000000000) {
+        const lastSeenDate = new Date(numericValue);
+        const now = new Date();
+        const diffMs = now.getTime() - lastSeenDate.getTime();
+        minutes = Math.floor(diffMs / 1000 / 60);
+      } else if (numericValue > 60 * 24 * 365) {
+        // If it's more than a year in minutes, probably seconds since epoch
+        const lastSeenDate = new Date(numericValue * 1000);
+        const now = new Date();
+        const diffMs = now.getTime() - lastSeenDate.getTime();
+        minutes = Math.floor(diffMs / 1000 / 60);
+      } else {
+        minutes = Math.round(numericValue);
+      }
+      
       if (minutes < 1) return 'Active now';
       if (minutes < 60) return `${minutes} min ago`;
       if (minutes < 1440) {
@@ -114,7 +131,8 @@ export default function FriendsScreen() {
           username: friend.username,
           status: friend.status || 'offline',
           lastSeen: friend.last_seen || friend.lastSeen || 'Recently',
-          avatar: friend.avatar && friend.avatar.startsWith('http') ? friend.avatar : null
+          avatar: friend.avatar && friend.avatar.startsWith('/api/') ? `${API_BASE_URL}${friend.avatar}` : 
+                  friend.avatar && friend.avatar.startsWith('http') ? friend.avatar : null
         }));
         
         setFriends(transformedFriends);
@@ -154,7 +172,8 @@ export default function FriendsScreen() {
           username: user.username,
           status: user.status || 'offline',
           lastSeen: user.last_seen || 'Recently',
-          avatar: user.avatar && user.avatar.startsWith('http') ? user.avatar : null
+          avatar: user.avatar && user.avatar.startsWith('/api/') ? `${API_BASE_URL}${user.avatar}` : 
+                  user.avatar && user.avatar.startsWith('http') ? user.avatar : null
         }));
         setFriends(transformedUsers);
       }
@@ -219,8 +238,12 @@ export default function FriendsScreen() {
     <View key={friend.id} style={styles.friendCard}>
       <View style={styles.friendInfo}>
         <View style={styles.friendAvatarContainer}>
-          {friend.avatar && friend.avatar.startsWith('http') ? (
-            <Image source={{ uri: friend.avatar }} style={styles.friendAvatar} />
+          {friend.avatar ? (
+            <Image 
+              source={{ uri: friend.avatar }} 
+              style={styles.friendAvatar}
+              onError={() => console.log('Failed to load avatar:', friend.avatar)}
+            />
           ) : (
             <View style={[styles.friendAvatar, { backgroundColor: friend.status === 'online' ? '#FF6B6B' : '#9E9E9E' }]}>
               <Text style={styles.friendAvatarText}>
