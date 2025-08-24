@@ -51,6 +51,14 @@ interface Gift {
   image?: string;
 }
 
+interface User {
+  id: string;
+  username: string;
+  role: string;
+  email?: string;
+  verified?: boolean;
+}
+
 export default function AdminScreen({ navigation }: any) {
   const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('emoji');
@@ -58,6 +66,11 @@ export default function AdminScreen({ navigation }: any) {
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // User search states
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Form states for adding emoji/gift
   const [itemName, setItemName] = useState('');
@@ -411,6 +424,83 @@ export default function AdminScreen({ navigation }: any) {
     }
   };
 
+  const searchUsers = async () => {
+    if (!searchUsername.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/search?username=${encodeURIComponent(searchUsername.trim())}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'ChatMe-Mobile-App',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.users || []);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        Alert.alert('Error', `Failed to search users: ${errorData.error || response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      Alert.alert('Error', 'Network error searching users');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const promoteUser = async (userId: string, username: string, newRole: 'admin' | 'mentor') => {
+    Alert.alert(
+      'Confirm Promotion',
+      `Are you sure you want to make ${username} ${newRole === 'admin' ? 'an admin' : 'a mentor'}?${newRole === 'mentor' ? ' (Role will expire after 1 month)' : ''}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          style: 'default',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const response = await fetch(`${API_BASE_URL}/api/admin/users/promote`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`,
+                  'User-Agent': 'ChatMe-Mobile-App',
+                },
+                body: JSON.stringify({
+                  userId,
+                  newRole
+                }),
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                Alert.alert('Success', data.message);
+                // Refresh search results
+                searchUsers();
+              } else {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to promote user');
+              }
+            } catch (error) {
+              console.error('Error promoting user:', error);
+              Alert.alert('Error', error.message || 'Failed to promote user');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleDeleteItem = async (id: string, type: 'emoji' | 'gift') => {
     Alert.alert(
       'Confirm Delete',
@@ -494,6 +584,49 @@ export default function AdminScreen({ navigation }: any) {
     </View>
   );
 
+  const renderUserItem = ({ item }: { item: User }) => (
+    <View style={styles.userCard}>
+      <View style={styles.userInfo}>
+        <View style={styles.userHeader}>
+          <Text style={styles.userName}>{item.username}</Text>
+          <View style={[styles.roleBadge, { backgroundColor: getRoleColor(item.role) }]}>
+            <Text style={styles.roleText}>{item.role}</Text>
+          </View>
+        </View>
+        {item.email && <Text style={styles.userEmail}>{item.email}</Text>}
+      </View>
+      <View style={styles.userActions}>
+        {item.role !== 'admin' && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.adminBtn]}
+            onPress={() => promoteUser(item.id, item.username, 'admin')}
+            disabled={loading}
+          >
+            <Text style={styles.actionBtnText}>Make Admin</Text>
+          </TouchableOpacity>
+        )}
+        {item.role !== 'mentor' && item.role !== 'admin' && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.mentorBtn]}
+            onPress={() => promoteUser(item.id, item.username, 'mentor')}
+            disabled={loading}
+          >
+            <Text style={styles.actionBtnText}>Make Mentor</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'admin': return '#F44336';
+      case 'mentor': return '#FF9800';
+      case 'merchant': return '#9C27B0';
+      default: return '#4CAF50';
+    }
+  };
+
   if (user?.role !== 'admin') {
     return (
       <SafeAreaView style={styles.container}>
@@ -555,6 +688,15 @@ export default function AdminScreen({ navigation }: any) {
             Gifts ({gifts.length})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'users' && styles.activeTab]}
+          onPress={() => setActiveTab('users')}
+        >
+          <Ionicons name="people-outline" size={20} color={activeTab === 'users' ? '#fff' : '#666'} />
+          <Text style={[styles.tabText, activeTab === 'users' && styles.activeTabText]}>
+            Users
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -575,7 +717,7 @@ export default function AdminScreen({ navigation }: any) {
               </View>
             }
           />
-        ) : (
+        ) : activeTab === 'gift' ? (
           <FlatList
             data={gifts}
             renderItem={renderGiftItem}
@@ -591,6 +733,55 @@ export default function AdminScreen({ navigation }: any) {
               </View>
             }
           />
+        ) : (
+          <View style={styles.userSearchContainer}>
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+              <TextInput
+                style={styles.searchInput}
+                value={searchUsername}
+                onChangeText={setSearchUsername}
+                placeholder="Search username..."
+                placeholderTextColor="#999"
+                onSubmitEditing={searchUsers}
+              />
+              <TouchableOpacity
+                style={styles.searchButton}
+                onPress={searchUsers}
+                disabled={searchLoading}
+              >
+                {searchLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="search" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Results */}
+            <FlatList
+              data={searchResults}
+              renderItem={renderUserItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                searchUsername.trim() ? (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="person-outline" size={60} color="#ccc" />
+                    <Text style={styles.emptyTitle}>No Users Found</Text>
+                    <Text style={styles.emptySubtitle}>Try searching with a different username</Text>
+                  </View>
+                ) : (
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="search-outline" size={60} color="#ccc" />
+                    <Text style={styles.emptyTitle}>Search Users</Text>
+                    <Text style={styles.emptySubtitle}>Enter a username to search and manage user roles</Text>
+                  </View>
+                )
+              }
+            />
+          </View>
         )}
       </View>
 
@@ -1106,5 +1297,96 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#E0E0E0',
+  },
+  userSearchContainer: {
+    flex: 1,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#fff',
+  },
+  searchButton: {
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 50,
+  },
+  userCard: {
+    backgroundColor: '#fff',
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginRight: 8,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  roleText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#666',
+  },
+  userActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  adminBtn: {
+    backgroundColor: '#F44336',
+  },
+  mentorBtn: {
+    backgroundColor: '#FF9800',
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

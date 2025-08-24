@@ -1271,7 +1271,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-// Admin endpoints for emoji management
+// Admin endpoints with /api prefix
 app.get('/api/admin/emojis', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
@@ -2671,7 +2671,7 @@ app.post('/api/users/:userId/avatar', async (req, res) => {
     if (!global.avatars) {
       global.avatars = {};
     }
-    
+
     global.avatars[avatarId] = {
       id: avatarId,
       filename,
@@ -2728,7 +2728,7 @@ app.get('/api/users/avatar/:avatarId', (req, res) => {
       res.setHeader('Content-Length', buffer.length);
       res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
       res.setHeader('Content-Disposition', `inline; filename="${avatar.filename}"`);
-      
+
       console.log(`Sending avatar with content-type: ${contentType}`);
       res.send(buffer);
     } catch (bufferError) {
@@ -3801,7 +3801,7 @@ io.on('connection', (socket) => {
 
         // Create message with unique ID (use tempId if provided for optimistic updates)
         const messageId = tempId ? tempId.replace('temp_', '') + '_confirmed' : `${Date.now()}_${sender}_${Math.random().toString(36).substr(2, 9)}`;
-        
+
         const newMessage = {
           id: messageId,
           sender,
@@ -4362,7 +4362,7 @@ app.get('/api/feed/posts', async (req, res) => {
 app.get('/api/rankings/games', async (req, res) => {
   try {
     console.log('Fetching games rankings...');
-    
+
     // Get top players by gaming achievements
     const result = await pool.query(`
       SELECT 
@@ -4398,7 +4398,7 @@ app.get('/api/rankings/games', async (req, res) => {
 app.get('/api/rankings/wealth', async (req, res) => {
   try {
     console.log('Fetching wealth rankings...');
-    
+
     // Get top players by wealth (credits + achievements)
     const result = await pool.query(`
       SELECT 
@@ -4437,7 +4437,7 @@ app.get('/api/rankings/wealth', async (req, res) => {
 app.get('/api/rankings/gifts', async (req, res) => {
   try {
     console.log('Fetching gifts rankings...');
-    
+
     // Get top players by gifts received
     const result = await pool.query(`
       SELECT 
@@ -4474,11 +4474,11 @@ app.get('/api/rankings/gifts', async (req, res) => {
   }
 });
 
-// Rankings endpoints without /api prefix for compatibility
+// Rankings endpoints without /api prefix
 app.get('/rankings/games', async (req, res) => {
   try {
     console.log('Fetching games rankings (no /api)...');
-    
+
     const result = await pool.query(`
       SELECT 
         u.id, 
@@ -4513,7 +4513,7 @@ app.get('/rankings/games', async (req, res) => {
 app.get('/rankings/wealth', async (req, res) => {
   try {
     console.log('Fetching wealth rankings (no /api)...');
-    
+
     const result = await pool.query(`
       SELECT 
         u.id, 
@@ -4551,7 +4551,7 @@ app.get('/rankings/wealth', async (req, res) => {
 app.get('/rankings/gifts', async (req, res) => {
   try {
     console.log('Fetching gifts rankings (no /api)...');
-    
+
     const result = await pool.query(`
       SELECT 
         u.id, 
@@ -4686,7 +4686,7 @@ app.get('/feed/posts', async (req, res) => {
   }
 });
 
-// Mentor endpoints without /api prefix for compatibility
+// Mentor endpoints without /api prefix
 app.get('/mentor/merchants', authenticateToken, async (req, res) => {
   try {
     console.log('=== GET MENTOR MERCHANTS REQUEST (no /api) ===');
@@ -4923,6 +4923,190 @@ app.post('/auth/login', async (req, res) => {
     res.status(500).json({ error: 'Internal server error during login' });
   }
 });
+
+// Admin user management endpoints
+app.get('/api/admin/users/search', authenticateToken, async (req, res) => {
+  try {
+    console.log('=== ADMIN USER SEARCH REQUEST ===');
+    console.log('User ID:', req.user.id);
+    console.log('User Role:', req.user.role);
+
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin role required.' });
+    }
+
+    const { username } = req.query;
+
+    if (!username || typeof username !== 'string' || username.trim().length < 2) {
+      return res.status(400).json({ error: 'Username must be at least 2 characters' });
+    }
+
+    const result = await pool.query(`
+      SELECT id, username, role, email, verified, created_at
+      FROM users 
+      WHERE username ILIKE $1 
+      ORDER BY username ASC 
+      LIMIT 20
+    `, [`%${username.trim()}%`]);
+
+    const users = result.rows.map(row => ({
+      id: row.id.toString(),
+      username: row.username,
+      role: row.role,
+      email: row.email,
+      verified: row.verified
+    }));
+
+    res.json({ users });
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/admin/users/promote', authenticateToken, async (req, res) => {
+  try {
+    console.log('=== ADMIN USER PROMOTION REQUEST ===');
+    console.log('User ID:', req.user.id);
+    console.log('User Role:', req.user.role);
+    console.log('Request body:', req.body);
+
+    // Check if user is admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin role required.' });
+    }
+
+    const { userId, newRole } = req.body;
+
+    if (!userId || !newRole) {
+      return res.status(400).json({ error: 'userId and newRole are required' });
+    }
+
+    if (!['admin', 'mentor'].includes(newRole)) {
+      return res.status(400).json({ error: 'Invalid role. Must be admin or mentor' });
+    }
+
+    // Get target user
+    const userResult = await pool.query('SELECT id, username, role FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = userResult.rows[0];
+
+    // Start transaction
+    await pool.query('BEGIN');
+
+    try {
+      // Update user role
+      await pool.query('UPDATE users SET role = $1 WHERE id = $2', [newRole, userId]);
+
+      // If promoting to mentor, add expiration record
+      if (newRole === 'mentor') {
+        // Remove any existing mentor promotion record
+        await pool.query('DELETE FROM mentor_promotions WHERE user_id = $1', [userId]);
+
+        // Calculate expiration date (1 month from now)
+        const expiresAt = new Date();
+        expiresAt.setMonth(expiresAt.getMonth() + 1);
+
+        // Create new mentor promotion record
+        await pool.query(`
+          INSERT INTO mentor_promotions (user_id, promoted_by, expires_at, status)
+          VALUES ($1, $2, $3, 'active')
+        `, [userId, req.user.id, expiresAt]);
+      }
+
+      await pool.query('COMMIT');
+
+      console.log(`User ${targetUser.username} promoted to ${newRole} by ${req.user.username}`);
+
+      res.json({
+        message: `User ${targetUser.username} has been successfully promoted to ${newRole}${newRole === 'mentor' ? ' (expires in 1 month)' : ''}`,
+        username: targetUser.username,
+        newRole: newRole
+      });
+
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Error promoting user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Cleanup expired tokens periodically
+const cleanupExpiredTokens = async () => {
+  try {
+    const result = await pool.query('DELETE FROM tokens WHERE expires_at < NOW()');
+    console.log(`Cleaned up ${result.rowCount} expired tokens`);
+  } catch (error) {
+    console.error('Error cleaning up expired tokens:', error);
+  }
+};
+
+// Cleanup expired mentor roles
+const cleanupExpiredMentors = async () => {
+  try {
+    // Find expired mentor promotions
+    const expiredResult = await pool.query(`
+      SELECT mp.user_id, u.username 
+      FROM mentor_promotions mp
+      JOIN users u ON mp.user_id = u.id
+      WHERE mp.expires_at < NOW() AND mp.status = 'active' AND u.role = 'mentor'
+    `);
+
+    if (expiredResult.rows.length > 0) {
+      console.log(`Found ${expiredResult.rows.length} expired mentor roles to cleanup`);
+
+      // Start transaction
+      await pool.query('BEGIN');
+
+      try {
+        // Update expired mentor promotions status
+        await pool.query(`
+          UPDATE mentor_promotions 
+          SET status = 'expired' 
+          WHERE expires_at < NOW() AND status = 'active'
+        `);
+
+        // Demote users back to regular user role
+        await pool.query(`
+          UPDATE users 
+          SET role = 'user' 
+          WHERE id IN (
+            SELECT mp.user_id 
+            FROM mentor_promotions mp
+            WHERE mp.expires_at < NOW() AND mp.status = 'expired'
+          ) AND role = 'mentor'
+        `);
+
+        await pool.query('COMMIT');
+
+        const expiredUsernames = expiredResult.rows.map(row => row.username).join(', ');
+        console.log(`Demoted expired mentors: ${expiredUsernames}`);
+
+      } catch (error) {
+        await pool.query('ROLLBACK');
+        throw error;
+      }
+    }
+  } catch (error) {
+    console.error('Error cleaning up expired mentor roles:', error);
+  }
+};
+
+// Run cleanup every hour
+setInterval(cleanupExpiredTokens, 60 * 60 * 1000);
+// Run mentor cleanup every 6 hours
+setInterval(cleanupExpiredMentors, 6 * 60 * 60 * 1000);
+
+// Run initial cleanup on server start
+cleanupExpiredMentors();
 
 
 server.listen(PORT, '0.0.0.0', () => {
