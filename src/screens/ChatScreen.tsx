@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Video } from 'expo-av';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../hooks';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -79,9 +80,11 @@ export default function ChatScreen() {
   const [activeGiftAnimation, setActiveGiftAnimation] = useState<any>(null);
   const [showUserGiftPicker, setShowUserGiftPicker] = useState(false);
   const [selectedGiftForUser, setSelectedGiftForUser] = useState<any>(null);
+  const [giftAnimationDuration, setGiftAnimationDuration] = useState(5000); // Default 5 seconds
   const scrollViewRef = useRef<ScrollView>(null); // Ref for the main ScrollView containing tabs
   const flatListRefs = useRef<Record<string, FlatList<Message> | null>>({}); // Refs for each FlatList in tabs
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true); // State for auto-scroll toggle
+  const giftVideoRef = useRef<Video>(null);
   const { user } = useAuth();
 
   // Get room data from navigation params
@@ -350,10 +353,14 @@ export default function ChatScreen() {
             timestamp: data.timestamp,
           });
 
-          // Hide animation after 3 seconds
+          // Set animation duration based on gift type
+          const duration = data.gift.type === 'animated' ? 6000 : 4000;
+          setGiftAnimationDuration(duration);
+
+          // Hide animation after duration
           setTimeout(() => {
             setActiveGiftAnimation(null);
-          }, 3000);
+          }, duration);
         }
       });
 
@@ -1472,10 +1479,14 @@ export default function ChatScreen() {
         timestamp: new Date(),
       });
 
-      // Hide animation after 3 seconds
+      // Set animation duration based on gift type
+      const duration = gift.type === 'animated' ? 6000 : 4000;
+      setGiftAnimationDuration(duration);
+
+      // Hide animation after duration
       setTimeout(() => {
         setActiveGiftAnimation(null);
-      }, 3000);
+      }, duration);
 
       // Send gift message via socket for public rooms
       if (socket) {
@@ -1541,9 +1552,13 @@ export default function ChatScreen() {
         timestamp: new Date(),
       });
 
+      // Set animation duration based on gift type
+      const duration = selectedGiftForUser.type === 'animated' ? 6000 : 4000;
+      setGiftAnimationDuration(duration);
+
       setTimeout(() => {
         setActiveGiftAnimation(null);
-      }, 3000);
+      }, duration);
 
       // Send private gift notification to target user
       if (socket) {
@@ -2330,37 +2345,80 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
-      {/* Gift Animation Overlay */}
+      {/* Gift Animation Overlay - Modal Style */}
       {activeGiftAnimation && (
-        <View style={styles.giftAnimationOverlay}>
-          <Animated.View style={styles.giftAnimationContainer}>
-            <View style={styles.giftAnimationMediaContainer}>
-              {activeGiftAnimation.animation ? (
-                <Image 
-                  source={typeof activeGiftAnimation.animation === 'string' ? { uri: activeGiftAnimation.animation } : activeGiftAnimation.animation} 
-                  style={styles.giftAnimationImage}
-                  resizeMode="contain"
-                />
-              ) : activeGiftAnimation.image ? (
-                <Image 
-                  source={typeof activeGiftAnimation.image === 'string' ? { uri: activeGiftAnimation.image } : activeGiftAnimation.image} 
-                  style={styles.giftAnimationImage}
-                  resizeMode="contain"
-                />
-              ) : (
-                <Text style={styles.giftAnimationIcon}>{activeGiftAnimation.icon}</Text>
-              )}
+        <Modal
+          visible={true}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setActiveGiftAnimation(null)}
+        >
+          <View style={styles.giftAnimationOverlay}>
+            <View style={styles.giftAnimationModal}>
+              <TouchableOpacity 
+                style={styles.closeGiftButton}
+                onPress={() => setActiveGiftAnimation(null)}
+              >
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+              
+              <View style={styles.giftAnimationContent}>
+                <View style={styles.giftAnimationMediaContainer}>
+                  {activeGiftAnimation.animation ? (
+                    // For animated GIFs or video files
+                    typeof activeGiftAnimation.animation === 'string' && 
+                    (activeGiftAnimation.animation.includes('.mp4') || activeGiftAnimation.animation.includes('.webm')) ? (
+                      <Video
+                        ref={giftVideoRef}
+                        source={{ uri: activeGiftAnimation.animation }}
+                        style={styles.giftAnimationVideo}
+                        shouldPlay={true}
+                        isLooping={false}
+                        resizeMode="contain"
+                        onPlaybackStatusUpdate={(status) => {
+                          if (status.isLoaded && status.didJustFinish) {
+                            setTimeout(() => {
+                              setActiveGiftAnimation(null);
+                            }, 500);
+                          }
+                        }}
+                      />
+                    ) : (
+                      // For GIF files
+                      <Image 
+                        source={typeof activeGiftAnimation.animation === 'string' ? { uri: activeGiftAnimation.animation } : activeGiftAnimation.animation} 
+                        style={styles.giftAnimationImage}
+                        resizeMode="contain"
+                      />
+                    )
+                  ) : activeGiftAnimation.image ? (
+                    <Image 
+                      source={typeof activeGiftAnimation.image === 'string' ? { uri: activeGiftAnimation.image } : activeGiftAnimation.image} 
+                      style={styles.giftAnimationImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={styles.giftAnimationIcon}>{activeGiftAnimation.icon}</Text>
+                  )}
+                </View>
+                
+                <View style={styles.giftAnimationInfo}>
+                  <Text style={styles.giftAnimationSender}>
+                    {activeGiftAnimation.sender}
+                  </Text>
+                  <Text style={styles.giftAnimationText}>
+                    sent {activeGiftAnimation.name} {activeGiftAnimation.icon}
+                    {activeGiftAnimation.recipient && ` to ${activeGiftAnimation.recipient}`}
+                  </Text>
+                  <View style={styles.giftAnimationPrice}>
+                    <Ionicons name="diamond" size={16} color="#FFD700" />
+                    <Text style={styles.giftPriceText}>{activeGiftAnimation.price}</Text>
+                  </View>
+                </View>
+              </View>
             </View>
-            <View style={styles.giftAnimationInfo}>
-              <Text style={styles.giftAnimationText}>
-                {activeGiftAnimation.recipient
-                  ? `${activeGiftAnimation.sender} sent ${activeGiftAnimation.name} to ${activeGiftAnimation.recipient}`
-                  : `${activeGiftAnimation.sender} sent ${activeGiftAnimation.name}`
-                }
-              </Text>
-            </View>
-          </Animated.View>
-        </View>
+          </View>
+        </Modal>
       )}
     </SafeAreaView>
   );
@@ -3477,48 +3535,92 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   giftAnimationOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
   },
-  giftAnimationContainer: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+  giftAnimationModal: {
+    width: '90%',
+    maxHeight: '70%',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+    borderWidth: 2,
+    borderColor: '#FFD700',
+  },
+  closeGiftButton: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
+  },
+  giftAnimationContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  giftAnimationMediaContainer: {
+    width: '100%',
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  giftAnimationImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  giftAnimationVideo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
   },
   giftAnimationIcon: {
-    fontSize: 48,
-    marginRight: 16,
+    fontSize: 80,
+    color: '#FFD700',
   },
   giftAnimationInfo: {
-    flex: 1,
+    alignItems: 'center',
+    width: '100%',
+  },
+  giftAnimationSender: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginBottom: 8,
   },
   giftAnimationText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: 'white',
-    flexShrink: 1,
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  giftAnimationMediaContainer: {
-    marginRight: 16,
-    justifyContent: 'center',
+  giftAnimationPrice: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#FFD700',
   },
-  giftAnimationImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
+  giftPriceText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginLeft: 4,
   },
 });
