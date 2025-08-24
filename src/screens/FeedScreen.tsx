@@ -21,10 +21,20 @@ import { useNavigation } from '@react-navigation/native';
 
 // Import Video with error handling
 let Video: any = null;
+let VideoView: any = null;
 try {
-  Video = require('expo-video').default;
+  const ExpoVideo = require('expo-av');
+  Video = ExpoVideo.Video;
+  VideoView = ExpoVideo.Video;
+  console.log('expo-av video loaded successfully');
 } catch (error) {
-  console.warn('expo-video not available:', error);
+  try {
+    Video = require('expo-video').default;
+    VideoView = require('expo-video').VideoView;
+    console.log('expo-video loaded successfully');
+  } catch (videoError) {
+    console.warn('Neither expo-av nor expo-video available:', error, videoError);
+  }
 }
 
 interface Comment {
@@ -647,64 +657,62 @@ export default function FeedScreen() {
       </View>
 
       {/* Media Files */}
-      {post.mediaFiles && Array.isArray(post.mediaFiles) && post.mediaFiles.length > 0 && (
-        <View style={styles.mediaContainer}>
-          {post.mediaFiles.map((media, index) => {
-            // Ensure media object exists and has required properties
-            if (!media || !media.type || !media.url) {
-              return null;
-            }
+        {post.mediaFiles && Array.isArray(post.mediaFiles) && post.mediaFiles.length > 0 && (
+          <View style={styles.mediaContainer}>
+            {post.mediaFiles.map((media, index) => {
+              // Ensure media object exists and has required properties
+              if (!media || !media.type || !media.url) {
+                console.log('Invalid media object:', media);
+                return null;
+              }
 
-            return (
-              <View key={media.id || `media-${index}`} style={styles.mediaItem}>
-                {media.type === 'photo' ? (
-                  <Image
-                    source={{ uri: media.url }}
-                    style={styles.postImage}
-                    resizeMode="cover"
-                    onError={(error) => {
-                      console.log('Image failed to load:', media.url, error);
-                    }}
-                  />
-                ) : media.type === 'video' ? (
-                  <TouchableOpacity style={styles.videoContainer} onPress={() => {
-                    // Check if video URL is valid
-                    if (media.url && media.url !== '/api/feed/media/undefined' && !media.url.includes('undefined')) {
-                      console.log('Opening video:', media.url);
-                      console.log('Media filename:', media.filename);
-                      console.log('Media ID:', media.id);
-                      
-                      // Construct full URL if needed
-                      const fullVideoUrl = media.url.startsWith('http') 
-                        ? media.url 
-                        : `${API_BASE_URL}${media.url}`;
-                      
-                      console.log('Full video URL:', fullVideoUrl);
-                      setSelectedVideoUrl(fullVideoUrl);
-                      setShowVideoModal(true);
-                    } else {
-                      console.log('Invalid video URL:', media.url);
-                      Alert.alert('Error', 'Video file not found or corrupted');
-                    }
-                  }}>
-                    <View style={styles.videoThumbnail}>
-                      <Ionicons name="play-circle" size={50} color="#fff" />
-                      <Text style={styles.videoPlayText}>Tap to play</Text>
-                    </View>
-                    <View style={styles.videoInfo}>
-                      <Text style={styles.videoTitle}>Video</Text>
-                      <Text style={styles.videoFilename}>{media.filename || 'Video file'}</Text>
-                      <Text style={styles.videoStatus}>
-                        {media.url && media.url !== '/api/feed/media/undefined' ? 'Ready' : 'Processing...'}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-      )}
+              // Construct full URL if needed
+              const fullMediaUrl = media.url.startsWith('http') 
+                ? media.url 
+                : `${API_BASE_URL}${media.url}`;
+
+              return (
+                <View key={media.id || `media-${index}`} style={styles.mediaItem}>
+                  {media.type === 'photo' ? (
+                    <Image
+                      source={{ uri: fullMediaUrl }}
+                      style={styles.postImage}
+                      resizeMode="cover"
+                      onLoad={() => console.log('Image loaded successfully:', fullMediaUrl)}
+                      onError={(error) => {
+                        console.log('Image failed to load:', fullMediaUrl, error.nativeEvent);
+                      }}
+                    />
+                  ) : media.type === 'video' ? (
+                    <TouchableOpacity style={styles.videoContainer} onPress={() => {
+                      // Check if video URL is valid
+                      if (media.url && media.url !== '/api/feed/media/undefined' && !media.url.includes('undefined')) {
+                        console.log('Opening video:', fullMediaUrl);
+                        setSelectedVideoUrl(fullMediaUrl);
+                        setShowVideoModal(true);
+                      } else {
+                        console.log('Invalid video URL:', media.url);
+                        Alert.alert('Error', 'Video file not found or corrupted');
+                      }
+                    }}>
+                      <View style={styles.videoThumbnail}>
+                        <Ionicons name="play-circle" size={50} color="#fff" />
+                        <Text style={styles.videoPlayText}>Tap to play</Text>
+                      </View>
+                      <View style={styles.videoInfo}>
+                        <Text style={styles.videoTitle}>Video</Text>
+                        <Text style={styles.videoFilename}>{media.filename || 'Video file'}</Text>
+                        <Text style={styles.videoStatus}>
+                          {media.url && media.url !== '/api/feed/media/undefined' ? 'Ready' : 'Processing...'}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
 
       <View style={styles.postActions}>
         <TouchableOpacity 
@@ -919,55 +927,79 @@ export default function FeedScreen() {
               </TouchableOpacity>
             </View>
             
-            {selectedVideoUrl && Video && (
-              <Video
-                ref={videoRef}
-                style={styles.videoPlayer}
-                source={{ uri: selectedVideoUrl }}
-                useNativeControls
-                resizeMode="contain"
-                isLooping={false}
-                shouldPlay={true}
-                onError={(error) => {
-                  console.error('Video playback error:', error);
-                  console.error('Video URL that failed:', selectedVideoUrl);
-                  
-                  let errorMessage = 'Failed to play video.';
-                  
-                  if (error && error.error) {
-                    const errorStr = error.error.toString();
-                    if (errorStr.includes('FileNotFoundException') || errorStr.includes('ENOENT')) {
-                      errorMessage = 'Video file not found on server. The file may have been moved or deleted.';
-                    } else if (errorStr.includes('Network')) {
-                      errorMessage = 'Network error while loading video. Please check your internet connection.';
-                    } else {
-                      errorMessage = `Video playback error: ${errorStr}`;
-                    }
-                  }
-                  
-                  Alert.alert('Video Error', errorMessage, [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        setShowVideoModal(false);
-                        setSelectedVideoUrl(null);
+            {selectedVideoUrl && (Video || VideoView) ? (
+              Video ? (
+                <Video
+                  ref={videoRef}
+                  style={styles.videoPlayer}
+                  source={{ uri: selectedVideoUrl }}
+                  useNativeControls
+                  resizeMode="contain"
+                  isLooping={false}
+                  shouldPlay={true}
+                  onError={(error) => {
+                    console.error('Video playback error:', error);
+                    console.error('Video URL that failed:', selectedVideoUrl);
+                    
+                    let errorMessage = 'Failed to play video.';
+                    
+                    if (error && error.error) {
+                      const errorStr = error.error.toString();
+                      if (errorStr.includes('FileNotFoundException') || errorStr.includes('ENOENT')) {
+                        errorMessage = 'Video file not found on server. The file may have been moved or deleted.';
+                      } else if (errorStr.includes('Network')) {
+                        errorMessage = 'Network error while loading video. Please check your internet connection.';
+                      } else {
+                        errorMessage = `Video playback error: ${errorStr}`;
                       }
                     }
-                  ]);
-                }}
-                onLoad={() => {
-                  console.log('Video loaded successfully from:', selectedVideoUrl);
-                }}
-                onLoadStart={() => {
-                  console.log('Video loading started for:', selectedVideoUrl);
-                }}
-              />
-            )}
-            {selectedVideoUrl && !Video && (
-              <View style={[styles.videoPlayer, { justifyContent: 'center', alignItems: 'center' }]}>
-                <Text style={{ color: '#fff', fontSize: 16 }}>Video player not available</Text>
+                    
+                    Alert.alert('Video Error', errorMessage, [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          setShowVideoModal(false);
+                          setSelectedVideoUrl(null);
+                        }
+                      }
+                    ]);
+                  }}
+                  onLoad={() => {
+                    console.log('Video loaded successfully from:', selectedVideoUrl);
+                  }}
+                  onLoadStart={() => {
+                    console.log('Video loading started for:', selectedVideoUrl);
+                  }}
+                />
+              ) : (
+                <VideoView
+                  ref={videoRef}
+                  style={styles.videoPlayer}
+                  source={{ uri: selectedVideoUrl }}
+                  useNativeControls
+                  resizeMode="contain"
+                  isLooping={false}
+                  shouldPlay={true}
+                />
+              )
+            ) : selectedVideoUrl ? (
+              <View style={[styles.videoPlayer, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
+                <Ionicons name="videocam-off" size={64} color="#666" />
+                <Text style={{ color: '#fff', fontSize: 16, marginTop: 16, textAlign: 'center' }}>
+                  Video player not available{'\n'}
+                  Please install expo-av or expo-video
+                </Text>
+                <TouchableOpacity 
+                  style={{ marginTop: 20, padding: 10, backgroundColor: '#333', borderRadius: 5 }}
+                  onPress={() => {
+                    setShowVideoModal(false);
+                    setSelectedVideoUrl(null);
+                  }}
+                >
+                  <Text style={{ color: '#fff' }}>Close</Text>
+                </TouchableOpacity>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </Modal>
