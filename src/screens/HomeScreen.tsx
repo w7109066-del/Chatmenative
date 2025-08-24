@@ -281,12 +281,12 @@ const HomeScreen = ({ navigation }: any) => {
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: StatusType) => {
+  const getStatusColor = (status: StatusType): string => {
     switch (status) {
       case 'online': return '#4CAF50';
-      case 'offline': return '#9E9E9E';
       case 'away': return '#FF9800';
       case 'busy': return '#F44336';
+      case 'offline': return '#9E9E9E';
       default: return '#9E9E9E';
     }
   };
@@ -303,30 +303,61 @@ const HomeScreen = ({ navigation }: any) => {
 
   const formatLastSeen = (lastSeen?: string) => {
     if (!lastSeen) return 'Active now';
-    
+
     // If it's already a formatted string like "3 minutes ago", return as is
     if (lastSeen.includes('ago') || lastSeen.includes('Active') || lastSeen.includes('Recently')) {
       return lastSeen;
     }
-    
+
+    // Handle very long numeric values (likely milliseconds or large numbers)
+    const numericValue = parseFloat(lastSeen);
+    if (!isNaN(numericValue)) {
+      let minutes = numericValue;
+
+      // If it's a very large number, assume it's milliseconds since epoch
+      if (numericValue > 1000000000000) {
+        const lastSeenDate = new Date(numericValue);
+        const now = new Date();
+        const diffMs = now.getTime() - lastSeenDate.getTime();
+        minutes = Math.floor(diffMs / 1000 / 60);
+      } else if (numericValue > 60 * 24 * 365) {
+        // If it's more than a year in minutes, probably seconds since epoch
+        const lastSeenDate = new Date(numericValue * 1000);
+        const now = new Date();
+        const diffMs = now.getTime() - lastSeenDate.getTime();
+        minutes = Math.floor(diffMs / 1000 / 60);
+      } else {
+        minutes = Math.round(numericValue);
+      }
+
+      if (minutes < 1) return 'Active now';
+      if (minutes < 60) return `${minutes} min ago`;
+      if (minutes < 1440) {
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
+      }
+      const days = Math.floor(minutes / 1440);
+      return `${days}d ago`;
+    }
+
     // Try to parse as a date
     const lastSeenDate = new Date(lastSeen);
     if (isNaN(lastSeenDate.getTime())) {
       return 'Recently';
     }
-    
+
     const now = new Date();
     const diffMs = now.getTime() - lastSeenDate.getTime();
     const diffMinutes = Math.floor(diffMs / 1000 / 60);
 
     if (diffMinutes < 1) return 'Active now';
-    if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
     if (diffMinutes < 1440) {
       const hours = Math.floor(diffMinutes / 60);
-      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      return `${hours}h ago`;
     }
     const days = Math.floor(diffMinutes / 1440);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
+    return `${days}d ago`;
   };
 
   const toggleStatus = () => {
@@ -413,7 +444,7 @@ const HomeScreen = ({ navigation }: any) => {
           <Text style={styles.friendStatus}>{formatLastSeen(friend.lastSeen)}</Text>
         </View>
       </View>
-      
+
       <View style={styles.actionButtons}>
         {/* Show action buttons only when searching users (not friends) */}
         {searchText.length >= 2 ? (
