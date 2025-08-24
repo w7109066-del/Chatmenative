@@ -1348,6 +1348,28 @@ export default function ChatScreen() {
   // Function to load gifts from the admin API
   const loadGifts = async () => {
     try {
+      // Local gift assets
+      const localGifts = [
+        { 
+          id: 'local_1', 
+          name: 'Lion Animation', 
+          icon: '🦁', 
+          price: 150, 
+          type: 'animated',
+          animation: require('../../assets/gift/animated/Lion.gif'),
+          category: 'animals'
+        },
+        { 
+          id: 'local_2', 
+          name: 'Lion Image', 
+          icon: '🦁', 
+          price: 100, 
+          type: 'static',
+          image: require('../../assets/gift/image/lion_img.gif'),
+          category: 'animals'
+        },
+      ];
+
       console.log('Loading gifts from:', `${API_BASE_URL}/api/gifts`);
       const response = await fetch(`${API_BASE_URL}/api/gifts`, {
         method: 'GET',
@@ -1357,30 +1379,55 @@ export default function ChatScreen() {
         },
       });
 
+      let serverGifts = [];
       if (response.ok) {
-        const giftData = await response.json();
-        setGiftList(giftData);
-        console.log('Gifts loaded:', giftData.length);
+        serverGifts = await response.json();
+        console.log('Server gifts loaded:', serverGifts.length);
       } else {
-        console.error('Failed to load gifts');
+        console.error('Failed to load server gifts');
         // Fallback to default gifts
-        setGiftList([
+        serverGifts = [
           { id: '1', name: 'Heart', icon: '❤️', price: 10, type: 'static' },
           { id: '2', name: 'Rose', icon: '🌹', price: 20, type: 'static' },
           { id: '3', name: 'Crown', icon: '👑', price: 50, type: 'static' },
           { id: '4', name: 'Diamond', icon: '💎', price: 100, type: 'static' },
           { id: '5', name: 'Rocket', icon: '🚀', price: 200, type: 'animated' },
-        ]);
+        ];
       }
+
+      // Combine local gifts with server gifts
+      const allGifts = [...localGifts, ...serverGifts];
+      setGiftList(allGifts);
+      console.log('Total gifts loaded:', allGifts.length);
     } catch (error) {
       console.error('Error loading gifts:', error);
-      setGiftList([
+      // Fallback with local gifts and defaults
+      const fallbackGifts = [
+        { 
+          id: 'local_1', 
+          name: 'Lion Animation', 
+          icon: '🦁', 
+          price: 150, 
+          type: 'animated',
+          animation: require('../../assets/gift/animated/Lion.gif'),
+          category: 'animals'
+        },
+        { 
+          id: 'local_2', 
+          name: 'Lion Image', 
+          icon: '🦁', 
+          price: 100, 
+          type: 'static',
+          image: require('../../assets/gift/image/lion_img.gif'),
+          category: 'animals'
+        },
         { id: '1', name: 'Heart', icon: '❤️', price: 10, type: 'static' },
         { id: '2', name: 'Rose', icon: '🌹', price: 20, type: 'static' },
         { id: '3', name: 'Crown', icon: '👑', price: 50, type: 'static' },
         { id: '4', name: 'Diamond', icon: '💎', price: 100, type: 'static' },
         { id: '5', name: 'Rocket', icon: '🚀', price: 200, type: 'animated' },
-      ]);
+      ];
+      setGiftList(fallbackGifts);
     }
   };
 
@@ -2166,7 +2213,21 @@ export default function ChatScreen() {
                       onPress={() => handleGiftSend(gift)}
                     >
                     <View style={styles.giftIconContainer}>
-                      <Text style={styles.giftIcon}>{gift.icon}</Text>
+                      {gift.image ? (
+                        <Image 
+                          source={typeof gift.image === 'string' ? { uri: gift.image } : gift.image} 
+                          style={styles.giftPreviewImage} 
+                          resizeMode="contain"
+                        />
+                      ) : gift.animation ? (
+                        <Image 
+                          source={typeof gift.animation === 'string' ? { uri: gift.animation } : gift.animation} 
+                          style={styles.giftPreviewImage} 
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Text style={styles.giftIcon}>{gift.icon}</Text>
+                      )}
                       {gift.type === 'animated' && (
                         <View style={styles.animatedBadge}>
                           <Text style={styles.animatedBadgeText}>✨</Text>
@@ -2273,7 +2334,23 @@ export default function ChatScreen() {
       {activeGiftAnimation && (
         <View style={styles.giftAnimationOverlay}>
           <Animated.View style={styles.giftAnimationContainer}>
-            <Text style={styles.giftAnimationIcon}>{activeGiftAnimation.icon}</Text>
+            <View style={styles.giftAnimationMediaContainer}>
+              {activeGiftAnimation.animation ? (
+                <Image 
+                  source={typeof activeGiftAnimation.animation === 'string' ? { uri: activeGiftAnimation.animation } : activeGiftAnimation.animation} 
+                  style={styles.giftAnimationImage}
+                  resizeMode="contain"
+                />
+              ) : activeGiftAnimation.image ? (
+                <Image 
+                  source={typeof activeGiftAnimation.image === 'string' ? { uri: activeGiftAnimation.image } : activeGiftAnimation.image} 
+                  style={styles.giftAnimationImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.giftAnimationIcon}>{activeGiftAnimation.icon}</Text>
+              )}
+            </View>
             <View style={styles.giftAnimationInfo}>
               <Text style={styles.giftAnimationText}>
                 {activeGiftAnimation.recipient
@@ -3344,6 +3421,11 @@ const styles = StyleSheet.create({
     color: '#FFD700',
     marginLeft: 2,
   },
+  giftPreviewImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+  },
   // Auto scroll button styles
   autoScrollButton: {
     position: 'absolute',
@@ -3428,5 +3510,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
     flexShrink: 1,
+  },
+  giftAnimationMediaContainer: {
+    marginRight: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  giftAnimationImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
   },
 });
