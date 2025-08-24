@@ -599,6 +599,20 @@ const initDatabase = async () => {
       )
     `);
 
+    // Create mentor_promotions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS mentor_promotions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        promoted_by INTEGER NOT NULL,
+        promoted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        status VARCHAR(20) DEFAULT 'active',
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (promoted_by) REFERENCES users(id)
+      )
+    `);
+
     console.log('Database tables initialized successfully');
 
     // Add default admin user 'asu' if not exists
