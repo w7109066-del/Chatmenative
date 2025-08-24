@@ -1097,19 +1097,21 @@ export default function ChatScreen() {
     return (
       <View style={styles.messageContainer}>
         <View style={styles.messageHeaderRow}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
+          <View style={styles.firstMessageRow}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
+            </View>
+            <Text style={[
+              styles.senderName,
+              { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+            ]}>
+              {item.sender}:
+            </Text>
+            <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
           </View>
-          <Text style={[
-            styles.senderName,
-            { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
-          ]}>
-            {item.sender}:
-          </Text>
-          <View style={styles.messageContentInline}>
+          <View style={styles.messageContentContainer}>
             {renderMessageContent(item.content)}
           </View>
-          <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
         </View>
       </View>
     );
@@ -2522,9 +2524,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   messageHeaderRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'flex-start',
-    flexWrap: 'wrap',
+  },
+  firstMessageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
   },
   leftSection: {
     flexDirection: 'row',
@@ -2570,12 +2576,12 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 11,
     color: '#999',
-    marginLeft: 6,
+    marginLeft: 'auto',
     alignSelf: 'flex-start',
   },
   messageContentContainer: {
-    marginTop: 0,
-    paddingLeft: 0,
+    marginTop: 2,
+    paddingLeft: 36, // Width of level badge + margin to align under badge
     width: '100%',
   },
   messageContentInline: {
