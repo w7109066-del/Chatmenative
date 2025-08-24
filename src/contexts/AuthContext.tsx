@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 
 // API configuration
 const getApiUrl = () => {
-  return 'https://a52268a5-98b3-4d93-8adf-880ecdf853e5-00-2guz79qaqu3ui.sisko.replit.devhttps://a52268a5-98b3-4d93-8adf-880ecdf853e5-00-2guz79qaqu3ui.sisko.replit.dev';
+  return 'https://a52268a5-98b3-4d93-8adf-880ecdf853e5-00-2guz79qaqu3ui.sisko.replit.dev';
 };
 
 const API_BASE_URL = getApiUrl();
@@ -82,6 +82,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('Attempting to login user:', username);
       console.log('API URL:', `${API_BASE_URL}/api/auth/login`);
+
+      // Test API connectivity first
+      try {
+        const testResponse = await fetch(`${API_BASE_URL}/api/health`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+        console.log('Health check response status:', testResponse.status);
+      } catch (healthError) {
+        console.error('Health check failed:', healthError);
+        throw new Error('Server is not reachable. Please check your internet connection and try again.');
+      }
 
       // Create abort controller for timeout
       const controller = new AbortController();
