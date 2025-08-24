@@ -85,6 +85,11 @@ export default function ChatScreen() {
   const flatListRefs = useRef<Record<string, FlatList<Message> | null>>({}); // Refs for each FlatList in tabs
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true); // State for auto-scroll toggle
   const giftVideoRef = useRef<Video>(null);
+  const [showUserTagMenu, setShowUserTagMenu] = useState(false);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
+  const [filteredParticipants, setFilteredParticipants] = useState<any[]>([]);
+  const [showMessageMenu, setShowMessageMenu] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const { user } = useAuth();
 
   // Get room data from navigation params
@@ -535,6 +540,46 @@ export default function ChatScreen() {
     });
   };
 
+  const handleMessageChange = (text: string) => {
+    setMessage(text);
+    
+    // Check for @ symbol to trigger user tagging
+    const lastAtIndex = text.lastIndexOf('@');
+    if (lastAtIndex !== -1) {
+      const searchText = text.substring(lastAtIndex + 1);
+      
+      if (searchText.length === 0) {
+        // Show all participants when @ is typed
+        setFilteredParticipants(participants);
+        setShowUserTagMenu(true);
+        setTagSearchQuery('');
+      } else if (searchText.length > 0 && !searchText.includes(' ')) {
+        // Filter participants based on search
+        const filtered = participants.filter(participant =>
+          participant.username.toLowerCase().includes(searchText.toLowerCase())
+        );
+        setFilteredParticipants(filtered);
+        setShowUserTagMenu(filtered.length > 0);
+        setTagSearchQuery(searchText);
+      } else {
+        setShowUserTagMenu(false);
+      }
+    } else {
+      setShowUserTagMenu(false);
+    }
+  };
+
+  const handleUserTag = (username: string) => {
+    const lastAtIndex = message.lastIndexOf('@');
+    if (lastAtIndex !== -1) {
+      const beforeAt = message.substring(0, lastAtIndex);
+      const afterSearch = message.substring(lastAtIndex + 1 + tagSearchQuery.length);
+      setMessage(`${beforeAt}@${username} ${afterSearch}`);
+    }
+    setShowUserTagMenu(false);
+    setTagSearchQuery('');
+  };
+
   const handleSendMessage = () => {
     // Check if user is muted (only for rooms, not private chats)
     if (chatTabs[activeTab]?.type !== 'private' && mutedUsers.includes(user?.username || '')) {
@@ -562,6 +607,7 @@ export default function ChatScreen() {
 
       // Clear message immediately
       setMessage('');
+      setShowUserTagMenu(false);
 
       // Add message optimistically to UI first (instant feedback)
       setChatTabs(prevTabs =>
@@ -931,81 +977,113 @@ export default function ChatScreen() {
     }
   };
 
+  // Map of local emoticon names to their require paths
+  const localEmoticonsMap: { [key: string]: any } = {
+    'Angry Old': require('../../assets/emoticon/angryold.png'),
+    'Annoyed Old': require('../../assets/emoticon/annoyedold.png'),
+    'Bum': require('../../assets/emoticon/bum.png'),
+    'Call Me': require('../../assets/emoticon/callme.png'),
+    'Cheeky Old': require('../../assets/emoticon/cheekyold.png'),
+    'Confused': require('../../assets/emoticon/confused.png'),
+    'Cool Old': require('../../assets/emoticon/coolold.png'),
+    'Cry': require('../../assets/emoticon/cry.png'),
+    'Curious Old': require('../../assets/emoticon/curiousold.png'),
+    'Dies': require('../../assets/emoticon/dies.png'),
+    'Disgust Old': require('../../assets/emoticon/disgustold.png'),
+    'Dizzy': require('../../assets/emoticon/dizzy.png'),
+    'Drooling': require('../../assets/emoticon/drooling.png'),
+    'Err': require('../../assets/emoticon/err.png'),
+    'Football': require('../../assets/emoticon/ffootball.png'),
+    'Football Trophy': require('../../assets/emoticon/ffootballtrophy.png'),
+    'Goal': require('../../assets/emoticon/fgoal.png'),
+    'Goal Post': require('../../assets/emoticon/fgoalpost.png'),
+    'Golden Boot': require('../../assets/emoticon/fgoldenboot.png'),
+    'Hat': require('../../assets/emoticon/fhat.png'),
+    'Flirt': require('../../assets/emoticon/flirt.png'),
+    'Mint': require('../../assets/emoticon/fmint.png'),
+    'Player': require('../../assets/emoticon/fplayer.png'),
+    'Red Boot': require('../../assets/emoticon/fredboot.png'),
+    'Red Card': require('../../assets/emoticon/fredcard.png'),
+    'Red Jersey': require('../../assets/emoticon/fredjersey.png'),
+    'Red Pants': require('../../assets/emoticon/fredpants.png'),
+    'Referee': require('../../assets/emoticon/freferee.png'),
+    'Ring': require('../../assets/emoticon/fring.png'),
+    'Scarf': require('../../assets/emoticon/fscarf.png'),
+    'Silver Ball': require('../../assets/emoticon/fsilverball.png'),
+    'Soccer Toy': require('../../assets/emoticon/fsoccertoy.png'),
+    'Socks': require('../../assets/emoticon/fsocks.png'),
+    'Trophy': require('../../assets/emoticon/ftrophy.png'),
+    'Whistle': require('../../assets/emoticon/fwhistle.png'),
+    'Whistle 2': require('../../assets/emoticon/fwhistle2.png'),
+    'Yellow Card': require('../../assets/emoticon/fyellowcard.png'),
+    'Happy': require('../../assets/emoticon/happy.png'),
+    'Hug Me': require('../../assets/emoticon/hugme.png'),
+    'Hug Me 2': require('../../assets/emoticon/hugme2.png'),
+    'Hypnotized': require('../../assets/emoticon/hypnotized.png'),
+    'Insane': require('../../assets/emoticon/insane.png'),
+    'Kiss Back': require('../../assets/emoticon/kissback.png'),
+    'Kiss Lips': require('../../assets/emoticon/kisslips.png'),
+    'Kiss Me': require('../../assets/emoticon/kissme.png'),
+    'Kiss Old': require('../../assets/emoticon/kissold.png'),
+    'Love': require('../../assets/emoticon/love.png'),
+    'Nerd': require('../../assets/emoticon/nerd.png'),
+    'Sad': require('../../assets/emoticon/sad.png'),
+    'Shocked': require('../../assets/emoticon/shocked.png'),
+    'Shy': require('../../assets/emoticon/shy.png'),
+    'Shy Old': require('../../assets/emoticon/shyold.png'),
+    'Silent': require('../../assets/emoticon/silent.png'),
+    'Sleeping': require('../../assets/emoticon/sleeping.png'),
+    'Sleepy': require('../../assets/emoticon/sleepy.png'),
+    'Speechless': require('../../assets/emoticon/speechless.png'),
+    'Sssh': require('../../assets/emoticon/sssh.png'),
+    'Unimpressed': require('../../assets/emoticon/unimpressed.png'),
+    'Very Happy': require('../../assets/emoticon/veryhappy.png'),
+    'Wink': require('../../assets/emoticon/wink.png'),
+    'Yuck': require('../../assets/emoticon/yuck.png'),
+    'Yum': require('../../assets/emoticon/yum.png'),
+  };
+
+  const handleMessageLongPress = (message: Message) => {
+    setSelectedMessage(message);
+    setShowMessageMenu(true);
+  };
+
+  const handleCopyMessage = () => {
+    if (selectedMessage) {
+      // Copy message content to clipboard (React Native doesn't have navigator.clipboard)
+      // We'll show an alert with the message content for now
+      Alert.alert(
+        'Message Copied',
+        `Content: ${selectedMessage.content}\nFrom: ${selectedMessage.sender}\nTime: ${formatTime(selectedMessage.timestamp)}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setShowMessageMenu(false);
+              setSelectedMessage(null);
+            }
+          }
+        ]
+      );
+    }
+  };
+
   const renderMessageContent = (content: string) => {
-    // Split content by image emoji patterns <img:url> and <localimg:name>
-    const parts = content.split(/(<img:[^>]+>|<localimg:[^>]+>)/g);
-
-    // Map of local emoticon names to their require paths
-    const localEmoticonsMap: { [key: string]: any } = {
-      'Angry Old': require('../../assets/emoticon/angryold.png'),
-      'Annoyed Old': require('../../assets/emoticon/annoyedold.png'),
-      'Bum': require('../../assets/emoticon/bum.png'),
-      'Call Me': require('../../assets/emoticon/callme.png'),
-      'Cheeky Old': require('../../assets/emoticon/cheekyold.png'),
-      'Confused': require('../../assets/emoticon/confused.png'),
-      'Cool Old': require('../../assets/emoticon/coolold.png'),
-      'Cry': require('../../assets/emoticon/cry.png'),
-      'Curious Old': require('../../assets/emoticon/curiousold.png'),
-      'Dies': require('../../assets/emoticon/dies.png'),
-      'Disgust Old': require('../../assets/emoticon/disgustold.png'),
-      'Dizzy': require('../../assets/emoticon/dizzy.png'),
-      'Drooling': require('../../assets/emoticon/drooling.png'),
-      'Err': require('../../assets/emoticon/err.png'),
-      'Football': require('../../assets/emoticon/ffootball.png'),
-      'Football Trophy': require('../../assets/emoticon/ffootballtrophy.png'),
-      'Goal': require('../../assets/emoticon/fgoal.png'),
-      'Goal Post': require('../../assets/emoticon/fgoalpost.png'),
-      'Golden Boot': require('../../assets/emoticon/fgoldenboot.png'),
-      'Hat': require('../../assets/emoticon/fhat.png'),
-      'Flirt': require('../../assets/emoticon/flirt.png'),
-      'Mint': require('../../assets/emoticon/fmint.png'),
-      'Player': require('../../assets/emoticon/fplayer.png'),
-      'Red Boot': require('../../assets/emoticon/fredboot.png'),
-      'Red Card': require('../../assets/emoticon/fredcard.png'),
-      'Red Jersey': require('../../assets/emoticon/fredjersey.png'),
-      'Red Pants': require('../../assets/emoticon/fredpants.png'),
-      'Referee': require('../../assets/emoticon/freferee.png'),
-      'Ring': require('../../assets/emoticon/fring.png'),
-      'Scarf': require('../../assets/emoticon/fscarf.png'),
-      'Silver Ball': require('../../assets/emoticon/fsilverball.png'),
-      'Soccer Toy': require('../../assets/emoticon/fsoccertoy.png'),
-      'Socks': require('../../assets/emoticon/fsocks.png'),
-      'Trophy': require('../../assets/emoticon/ftrophy.png'),
-      'Whistle': require('../../assets/emoticon/fwhistle.png'),
-      'Whistle 2': require('../../assets/emoticon/fwhistle2.png'),
-      'Yellow Card': require('../../assets/emoticon/fyellowcard.png'),
-      'Happy': require('../../assets/emoticon/happy.png'),
-      'Hug Me': require('../../assets/emoticon/hugme.png'),
-      'Hug Me 2': require('../../assets/emoticon/hugme2.png'),
-      'Hypnotized': require('../../assets/emoticon/hypnotized.png'),
-      'Insane': require('../../assets/emoticon/insane.png'),
-      'Kiss Back': require('../../assets/emoticon/kissback.png'),
-      'Kiss Lips': require('../../assets/emoticon/kisslips.png'),
-      'Kiss Me': require('../../assets/emoticon/kissme.png'),
-      'Kiss Old': require('../../assets/emoticon/kissold.png'),
-      'Love': require('../../assets/emoticon/love.png'),
-      'Nerd': require('../../assets/emoticon/nerd.png'),
-      'Sad': require('../../assets/emoticon/sad.png'),
-      'Shocked': require('../../assets/emoticon/shocked.png'),
-      'Shy': require('../../assets/emoticon/shy.png'),
-      'Shy Old': require('../../assets/emoticon/shyold.png'),
-      'Silent': require('../../assets/emoticon/silent.png'),
-      'Sleeping': require('../../assets/emoticon/sleeping.png'),
-      'Sleepy': require('../../assets/emoticon/sleepy.png'),
-      'Speechless': require('../../assets/emoticon/speechless.png'),
-      'Sssh': require('../../assets/emoticon/sssh.png'),
-      'Unimpressed': require('../../assets/emoticon/unimpressed.png'),
-      'Very Happy': require('../../assets/emoticon/veryhappy.png'),
-      'Wink': require('../../assets/emoticon/wink.png'),
-      'Yuck': require('../../assets/emoticon/yuck.png'),
-      'Yum': require('../../assets/emoticon/yum.png'),
-    };
-
+    // Split content by @ mentions and style them
+    const parts = content.split(/(@\w+)/g);
+    
     return (
       <View style={styles.messageContentContainer}>
         <Text style={styles.messageContent} numberOfLines={0}>
           {parts.map((part, index) => {
-            if (part.startsWith('<img:') && part.endsWith('>')) {
+            if (part.startsWith('@')) {
+              // Style @ mentions
+              return (
+                <Text key={index} style={styles.mentionText}>
+                  {part}
+                </Text>
+              );
+            } else if (part.startsWith('<img:') && part.endsWith('>')) {
               // Extract server image URL
               const imageUrl = part.slice(5, -1);
               return (
@@ -1083,7 +1161,10 @@ export default function ChatScreen() {
     // Handle gift messages
     if (item.type === 'gift') {
       return (
-        <View style={styles.giftMessageContainer}>
+        <TouchableOpacity 
+          style={styles.giftMessageContainer}
+          onLongPress={() => handleMessageLongPress(item)}
+        >
           <View style={styles.giftMessageBubble}>
             <View style={styles.giftMessageHeader}>
               <Text style={[styles.senderName, { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }]}>
@@ -1098,13 +1179,16 @@ export default function ChatScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       );
     }
 
     // Regular message
     return (
-      <View style={styles.messageContainer}>
+      <TouchableOpacity 
+        style={styles.messageContainer}
+        onLongPress={() => handleMessageLongPress(item)}
+      >
         <View style={styles.messageHeaderRow}>
           <View style={styles.levelBadge}>
             <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
@@ -1120,7 +1204,7 @@ export default function ChatScreen() {
           </View>
           <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1827,7 +1911,7 @@ export default function ChatScreen() {
               placeholder="Type a message"
               placeholderTextColor="#999"
               value={message}
-              onChangeText={setMessage}
+              onChangeText={handleMessageChange}
               multiline
               blurOnSubmit={false}
               returnKeyType="default"
@@ -2343,6 +2427,115 @@ export default function ChatScreen() {
             </ScrollView>
           </View>
         </View>
+      </Modal>
+
+      {/* User Tag Menu Modal */}
+      <Modal
+        visible={showUserTagMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowUserTagMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.userTagModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUserTagMenu(false)}
+        >
+          <View style={styles.userTagMenu}>
+            <View style={styles.userTagHeader}>
+              <Text style={styles.userTagTitle}>Select User to Tag</Text>
+            </View>
+            <ScrollView style={styles.userTagList} showsVerticalScrollIndicator={false}>
+              {filteredParticipants.map((participant, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.userTagItem}
+                  onPress={() => handleUserTag(participant.username)}
+                >
+                  <View style={[
+                    styles.participantAvatar,
+                    { backgroundColor: getRoleColor(participant.role, participant.username, chatTabs[activeTab]?.id) }
+                  ]}>
+                    <Text style={styles.participantAvatarText}>
+                      {participant.username ? participant.username.charAt(0).toUpperCase() : 'U'}
+                    </Text>
+                  </View>
+                  <View style={styles.userTagInfo}>
+                    <Text style={styles.userTagName}>@{participant.username}</Text>
+                    <Text style={styles.userTagRole}>
+                      {(() => {
+                        const currentRoom = chatTabs[activeTab];
+                        const isOwner = currentRoom && currentRoom.managedBy === participant.username;
+
+                        if (isOwner) return '👤 Owner';
+
+                        switch (participant.role) {
+                          case 'admin': return '👑 Admin';
+                          case 'merchant': return '🏪 Merchant';
+                          case 'mentor': return '🎓 Mentor';
+                          default: return '👤 User';
+                        }
+                      })()}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Message Copy Menu Modal */}
+      <Modal
+        visible={showMessageMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowMessageMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMessageMenu(false)}
+        >
+          <View style={styles.messageContextMenu}>
+            <View style={styles.messageMenuHeader}>
+              <Text style={styles.messageMenuTitle}>Message Options</Text>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.messageMenuItem}
+              onPress={handleCopyMessage}
+            >
+              <Ionicons name="copy-outline" size={20} color="#333" />
+              <Text style={styles.messageMenuText}>Copy Message</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.messageMenuItem}
+              onPress={() => {
+                if (selectedMessage) {
+                  setMessage(`@${selectedMessage.sender} `);
+                }
+                setShowMessageMenu(false);
+                setSelectedMessage(null);
+              }}
+            >
+              <Ionicons name="at-outline" size={20} color="#333" />
+              <Text style={styles.messageMenuText}>Reply to User</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.messageMenuItem, styles.lastMessageMenuItem]}
+              onPress={() => {
+                setShowMessageMenu(false);
+                setSelectedMessage(null);
+              }}
+            >
+              <Ionicons name="close-outline" size={20} color="#666" />
+              <Text style={[styles.messageMenuText, { color: '#666' }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Gift Animation Overlay - Modal Style */}
@@ -3622,5 +3815,106 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFD700',
     marginLeft: 4,
+  },
+  // User Tag Menu Styles
+  userTagModalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+    paddingBottom: 120,
+  },
+  userTagMenu: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    maxHeight: 200,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  userTagHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  userTagTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  userTagList: {
+    maxHeight: 150,
+  },
+  userTagItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  userTagInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  userTagName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  userTagRole: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  // Message Context Menu Styles
+  messageContextMenu: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingVertical: 8,
+    marginHorizontal: 20,
+    minWidth: 180,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  messageMenuHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  messageMenuTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  messageMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  lastMessageMenuItem: {
+    borderBottomWidth: 0,
+  },
+  messageMenuText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  // Mention Text Style
+  mentionText: {
+    color: '#8B5CF6',
+    fontWeight: 'bold',
   },
 });
