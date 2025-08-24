@@ -1407,36 +1407,37 @@ export default function ChatScreen() {
 
     // Handle join/leave messages
     if (item.type === 'join' || item.type === 'leave') {
-      const shouldShowBubble = item.userRole === 'mentor' || item.userRole === 'merchant';
+      const currentRoom = chatTabs[activeTab];
+      const roomName = currentRoom?.title || 'Room';
+      const username = item.sender;
+      const userRole = item.userRole || 'user';
+      
+      // Get role badge
+      const getRoleBadgeText = (role: string) => {
+        switch (role) {
+          case 'admin': return '👑';
+          case 'mentor': return '🎓';
+          case 'merchant': return '🏪';
+          default: return '👤';
+        }
+      };
 
-      if (shouldShowBubble) {
-        return (
-          <View style={styles.joinLeaveContainer}>
-            <View style={[
-              styles.joinLeaveBubble,
-              item.type === 'join' ? styles.joinBubble : styles.leaveBubble
-            ]}>
-              <Text style={styles.joinLeaveText}>
-                {item.content}
-              </Text>
-              <Text style={styles.joinLeaveTime}>
-                {formatTime(item.timestamp)}
-              </Text>
-            </View>
-          </View>
-        );
-      } else {
-        return (
-          <View style={styles.systemMessageContainer}>
-            <Text style={styles.systemMessageText}>
-              {item.content}
-            </Text>
-            <Text style={styles.systemMessageTime}>
-              {formatTime(item.timestamp)}
-            </Text>
-          </View>
-        );
-      }
+      const actionText = item.type === 'join' ? 'has entered' : 'has left';
+      const formattedMessage = `[${roomName}] {${username}} ${getRoleBadgeText(userRole)} ${actionText}`;
+
+      return (
+        <TouchableOpacity 
+          style={styles.joinLeaveMessageContainer}
+          onLongPress={() => handleMessageLongPress(item)}
+        >
+          <Text style={styles.joinLeaveMessageText}>
+            {formattedMessage}
+          </Text>
+          <Text style={styles.joinLeaveMessageTime}>
+            {formatTime(item.timestamp)}
+          </Text>
+        </TouchableOpacity>
+      );
     }
 
     // Handle gift messages
@@ -3594,42 +3595,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   // Join/Leave message styles
-  joinLeaveContainer: {
-    alignItems: 'center',
-    marginVertical: 8,
+  joinLeaveMessageContainer: {
+    marginVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
   },
-  joinLeaveBubble: {
-    maxWidth: '80%',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  joinBubble: {
-    backgroundColor: '#E8F5E8',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  leaveBubble: {
-    backgroundColor: '#FFE8E8',
-    borderWidth: 1,
-    borderColor: '#F44336',
-  },
-  joinLeaveText: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  joinLeaveTime: {
-    fontSize: 11,
+  joinLeaveMessageText: {
+    fontSize: 13,
     color: '#666',
-    textAlign: 'center',
-    marginTop: 4,
+    fontWeight: '500',
+    textAlign: 'left',
+  },
+  joinLeaveMessageTime: {
+    fontSize: 10,
+    color: '#999',
+    textAlign: 'left',
+    marginTop: 2,
   },
   systemMessageContainer: {
     alignItems: 'center',
