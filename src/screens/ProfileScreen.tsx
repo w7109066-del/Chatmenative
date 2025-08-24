@@ -24,10 +24,10 @@ const getApiUrl = () => {
     if (currentHost && currentHost.includes('replit.dev')) {
       return `${protocol}//${currentHost.replace(':3000', ':5000')}`;
     }
-    return 'https://a52268a5-98b3-4d93-8adf-880ecdf853e5-00-2guz79qaqu3ui.sisko.replit.dev:5000';
+    return 'https://6f78a39c-dae9-42ae-bed4-1a98a4d51ca0-00-36d746w25elda.pike.replit.dev:5000';
   }
   // For mobile/React Native
-  return 'https://a52268a5-98b3-4d93-8adf-880ecdf853e5-00-2guz79qaqu3ui.sisko.replit.dev';
+  return 'https://6f78a39c-dae9-42ae-bed4-1a98a4d51ca0-00-36d746w25elda.pike.replit.dev';
 };
 
 const API_BASE_URL = getApiUrl();
