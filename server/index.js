@@ -2524,12 +2524,25 @@ app.get('/api/users/:userId/profile', async (req, res) => {
   try {
     const { userId } = req.params;
     console.log('=== GET USER PROFILE REQUEST ===');
-    console.log('User ID:', userId);
+    console.log('User ID/Username:', userId);
 
-    const result = await pool.query(
-      'SELECT id, username, email, bio, phone, avatar, gender, birth_date, country, signature, verified, role, exp, level FROM users WHERE id = $1',
-      [userId]
-    );
+    // Check if userId is numeric (ID) or string (username)
+    const isNumeric = /^\d+$/.test(userId);
+    let result;
+
+    if (isNumeric) {
+      // Query by ID
+      result = await pool.query(
+        'SELECT id, username, email, bio, phone, avatar, gender, birth_date, country, signature, verified, role, exp, level FROM users WHERE id = $1',
+        [userId]
+      );
+    } else {
+      // Query by username
+      result = await pool.query(
+        'SELECT id, username, email, bio, phone, avatar, gender, birth_date, country, signature, verified, role, exp, level FROM users WHERE username = $1',
+        [userId]
+      );
+    }
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -2733,12 +2746,25 @@ app.get('/api/users/:userId/album', async (req, res) => {
   try {
     const { userId } = req.params;
     console.log('=== GET USER ALBUM REQUEST ===');
-    console.log('User ID:', userId);
+    console.log('User ID/Username:', userId);
+
+    // Check if userId is numeric (ID) or string (username)
+    const isNumeric = /^\d+$/.test(userId);
+    let actualUserId = userId;
+
+    if (!isNumeric) {
+      // Convert username to user ID
+      const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      actualUserId = userResult.rows[0].id;
+    }
 
     // Fetch from database
     const result = await pool.query(`
       SELECT * FROM user_album WHERE user_id = $1 ORDER BY uploaded_at DESC
-    `, [userId]);
+    `, [actualUserId]);
 
     const album = result.rows.map(row => ({
       id: row.id,
@@ -2759,7 +2785,20 @@ app.get('/api/users/:userId/gifts', async (req, res) => {
   try {
     const { userId } = req.params;
     console.log('=== GET USER GIFTS REQUEST ===');
-    console.log('User ID:', userId);
+    console.log('User ID/Username:', userId);
+
+    // Check if userId is numeric (ID) or string (username)
+    const isNumeric = /^\d+$/.test(userId);
+    let actualUserId = userId;
+
+    if (!isNumeric) {
+      // Convert username to user ID
+      const userResult = await pool.query('SELECT id FROM users WHERE username = $1', [userId]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      actualUserId = userResult.rows[0].id;
+    }
 
     // Fetch from database
     const result = await pool.query(`
@@ -2767,7 +2806,7 @@ app.get('/api/users/:userId/gifts', async (req, res) => {
       FROM user_gifts
       WHERE user_id = $1
       GROUP BY gift_type
-    `, [userId]);
+    `, [actualUserId]);
 
     const gifts = result.rows.map(row => {
       const giftConfig = {
