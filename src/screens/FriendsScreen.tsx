@@ -56,6 +56,20 @@ export default function FriendsScreen() {
       return lastSeen;
     }
     
+    // Handle numeric values (likely minutes)
+    const numericValue = parseFloat(lastSeen);
+    if (!isNaN(numericValue)) {
+      const minutes = Math.round(numericValue);
+      if (minutes < 1) return 'Active now';
+      if (minutes < 60) return `${minutes} min ago`;
+      if (minutes < 1440) {
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
+      }
+      const days = Math.floor(minutes / 1440);
+      return `${days}d ago`;
+    }
+    
     // Try to parse as a date
     const lastSeenDate = new Date(lastSeen);
     if (isNaN(lastSeenDate.getTime())) {
@@ -67,13 +81,13 @@ export default function FriendsScreen() {
     const diffMinutes = Math.floor(diffMs / 1000 / 60);
 
     if (diffMinutes < 1) return 'Active now';
-    if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
     if (diffMinutes < 1440) {
       const hours = Math.floor(diffMinutes / 60);
-      return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      return `${hours}h ago`;
     }
     const days = Math.floor(diffMinutes / 1440);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
+    return `${days}d ago`;
   };
 
   const fetchFriends = async () => {
@@ -100,7 +114,7 @@ export default function FriendsScreen() {
           username: friend.username,
           status: friend.status || 'offline',
           lastSeen: friend.last_seen || friend.lastSeen || 'Recently',
-          avatar: friend.avatar || friend.username?.charAt(0).toUpperCase()
+          avatar: friend.avatar && friend.avatar.startsWith('http') ? friend.avatar : null
         }));
         
         setFriends(transformedFriends);
@@ -140,7 +154,7 @@ export default function FriendsScreen() {
           username: user.username,
           status: user.status || 'offline',
           lastSeen: user.last_seen || 'Recently',
-          avatar: user.avatar || user.username?.charAt(0).toUpperCase()
+          avatar: user.avatar && user.avatar.startsWith('http') ? user.avatar : null
         }));
         setFriends(transformedUsers);
       }
@@ -205,12 +219,12 @@ export default function FriendsScreen() {
     <View key={friend.id} style={styles.friendCard}>
       <View style={styles.friendInfo}>
         <View style={styles.friendAvatarContainer}>
-          {friend.avatar?.startsWith('http') ? (
+          {friend.avatar && friend.avatar.startsWith('http') ? (
             <Image source={{ uri: friend.avatar }} style={styles.friendAvatar} />
           ) : (
             <View style={[styles.friendAvatar, { backgroundColor: friend.status === 'online' ? '#FF6B6B' : '#9E9E9E' }]}>
               <Text style={styles.friendAvatarText}>
-                {friend.avatar || friend.name?.charAt(0).toUpperCase() || 'U'}
+                {friend.name?.charAt(0).toUpperCase() || friend.username?.charAt(0).toUpperCase() || 'U'}
               </Text>
             </View>
           )}
