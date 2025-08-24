@@ -10,7 +10,8 @@ import {
   Image,
   Alert,
   RefreshControl,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,6 +38,8 @@ export default function FriendsScreen() {
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showFriendMenu, setShowFriendMenu] = useState(false);
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
 
   const getStatusColor = (status: StatusType): string => {
     switch (status) {
@@ -216,6 +219,64 @@ export default function FriendsScreen() {
     });
   };
 
+  const handleFriendPress = (friend: Friend) => {
+    setSelectedFriend(friend);
+    setShowFriendMenu(true);
+  };
+
+  const handleViewProfile = () => {
+    if (selectedFriend) {
+      setShowFriendMenu(false);
+      navigation.navigate('Profile', { 
+        userId: selectedFriend.id,
+        username: selectedFriend.username 
+      });
+    }
+  };
+
+  const handleStartChat = () => {
+    if (selectedFriend) {
+      setShowFriendMenu(false);
+      startChat(selectedFriend.id, selectedFriend.name);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!selectedFriend) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/${selectedFriend.id}/block`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+          'User-Agent': 'ChatMe-Mobile-App',
+        },
+      });
+
+      if (response.ok) {
+        Alert.alert('Success', `${selectedFriend.name} has been blocked`);
+        setShowFriendMenu(false);
+        fetchFriends(); // Refresh friends list
+      } else {
+        Alert.alert('Error', 'Failed to block user');
+      }
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      Alert.alert('Error', 'Failed to block user');
+    }
+  };
+
+  const handleSendCredit = () => {
+    if (selectedFriend) {
+      setShowFriendMenu(false);
+      navigation.navigate('Credit', { 
+        recipientId: selectedFriend.id,
+        recipientName: selectedFriend.name 
+      });
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     setSearchText('');
@@ -236,7 +297,11 @@ export default function FriendsScreen() {
 
   const renderFriend = (friend: Friend) => (
     <View key={friend.id} style={styles.friendCard}>
-      <View style={styles.friendInfo}>
+      <TouchableOpacity 
+        style={styles.friendInfo}
+        onPress={() => handleFriendPress(friend)}
+        activeOpacity={0.7}
+      >
         <View style={styles.friendAvatarContainer}>
           {friend.avatar ? (
             <Image 
@@ -257,7 +322,7 @@ export default function FriendsScreen() {
           <Text style={styles.friendName}>{friend.name}</Text>
           <Text style={styles.friendStatus}>{formatLastSeen(friend.lastSeen)}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
       
       <View style={styles.actionButtons}>
         {searchText.length >= 2 ? (
@@ -347,6 +412,67 @@ export default function FriendsScreen() {
           friends.map(renderFriend)
         )}
       </ScrollView>
+
+      {/* Friend Context Menu Modal */}
+      <Modal
+        visible={showFriendMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFriendMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowFriendMenu(false)}
+        >
+          <View style={styles.friendContextMenu}>
+            <View style={styles.friendMenuHeader}>
+              <View style={styles.friendMenuAvatar}>
+                {selectedFriend?.avatar ? (
+                  <Image source={{ uri: selectedFriend.avatar }} style={styles.friendMenuAvatarImage} />
+                ) : (
+                  <Text style={styles.friendMenuAvatarText}>
+                    {selectedFriend?.name?.charAt(0).toUpperCase() || selectedFriend?.username?.charAt(0).toUpperCase() || 'U'}
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.friendMenuName}>{selectedFriend?.name}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.friendMenuItem}
+              onPress={handleStartChat}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color="#2196F3" />
+              <Text style={styles.friendMenuText}>Chat</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.friendMenuItem}
+              onPress={handleViewProfile}
+            >
+              <Ionicons name="person-outline" size={20} color="#333" />
+              <Text style={styles.friendMenuText}>Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.friendMenuItem}
+              onPress={handleBlockUser}
+            >
+              <Ionicons name="ban-outline" size={20} color="#FF9800" />
+              <Text style={[styles.friendMenuText, { color: '#FF9800' }]}>Block</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.friendMenuItem, styles.lastFriendMenuItem]}
+              onPress={handleSendCredit}
+            >
+              <Ionicons name="wallet-outline" size={20} color="#4CAF50" />
+              <Text style={[styles.friendMenuText, { color: '#4CAF50' }]}>Send Credit</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -505,5 +631,74 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendContextMenu: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    minWidth: 250,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  friendMenuHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  friendMenuAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  friendMenuAvatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  friendMenuAvatarText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  friendMenuName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  friendMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  lastFriendMenuItem: {
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    marginTop: 8,
+    paddingTop: 15,
+  },
+  friendMenuText: {
+    fontSize: 16,
+    marginLeft: 15,
+    color: '#333',
+    fontWeight: '500',
   },
 });
