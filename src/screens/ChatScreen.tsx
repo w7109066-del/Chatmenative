@@ -580,6 +580,259 @@ export default function ChatScreen() {
     setTagSearchQuery('');
   };
 
+  const handleSpecialCommand = (commandMessage: string, currentRoomId: string) => {
+    const parts = commandMessage.split(' ');
+    const command = parts[0].toLowerCase();
+    const args = parts.slice(1);
+
+    switch (command) {
+      case '/me': {
+        if (args.length > 0) {
+          const actionText = args.join(' ');
+          const meMessage = {
+            id: `me_${Date.now()}_${user?.username}`,
+            sender: 'System',
+            content: `* ${user?.username} ${actionText}`,
+            timestamp: new Date(),
+            roomId: currentRoomId,
+            role: 'system',
+            level: 1,
+            type: 'me'
+          };
+          
+          // Add locally and emit to server
+          setChatTabs(prevTabs =>
+            prevTabs.map(tab => 
+              tab.id === currentRoomId
+                ? { ...tab, messages: [...tab.messages, meMessage] }
+                : tab
+            )
+          );
+          
+          socket?.emit('sendMessage', {
+            roomId: currentRoomId,
+            sender: 'System',
+            content: `* ${user?.username} ${actionText}`,
+            role: 'system',
+            level: 1,
+            type: 'me'
+          });
+        }
+        break;
+      }
+
+      case '/whois': {
+        if (args.length > 0) {
+          const targetUsername = args[0];
+          const targetUser = participants.find(p => p.username.toLowerCase() === targetUsername.toLowerCase());
+          
+          if (targetUser) {
+            const whoisMessage = {
+              id: `whois_${Date.now()}_${user?.username}`,
+              sender: 'System',
+              content: `📋 User Info: ${targetUser.username}\n🌍 Country: ${targetUser.country || 'Unknown'}\n⭐ Level: ${targetUser.level || 1}\n🔰 Role: ${targetUser.role || 'user'}\n📅 Status: ${targetUser.isOnline ? 'Online' : 'Offline'}\n⏰ Last Seen: ${targetUser.lastSeen || 'Unknown'}`,
+              timestamp: new Date(),
+              roomId: currentRoomId,
+              role: 'system',
+              level: 1,
+              type: 'whois'
+            };
+            
+            // Only show to current user (local only)
+            setChatTabs(prevTabs =>
+              prevTabs.map(tab => 
+                tab.id === currentRoomId
+                  ? { ...tab, messages: [...tab.messages, whoisMessage] }
+                  : tab
+              )
+            );
+          } else {
+            const errorMessage = {
+              id: `error_${Date.now()}_${user?.username}`,
+              sender: 'System',
+              content: `❌ User '${targetUsername}' not found in this room.`,
+              timestamp: new Date(),
+              roomId: currentRoomId,
+              role: 'system',
+              level: 1,
+              type: 'error'
+            };
+            
+            setChatTabs(prevTabs =>
+              prevTabs.map(tab => 
+                tab.id === currentRoomId
+                  ? { ...tab, messages: [...tab.messages, errorMessage] }
+                  : tab
+              )
+            );
+          }
+        } else {
+          const helpMessage = {
+            id: `help_${Date.now()}_${user?.username}`,
+            sender: 'System',
+            content: '❌ Usage: /whois [username]',
+            timestamp: new Date(),
+            roomId: currentRoomId,
+            role: 'system',
+            level: 1,
+            type: 'error'
+          };
+          
+          setChatTabs(prevTabs =>
+            prevTabs.map(tab => 
+              tab.id === currentRoomId
+                ? { ...tab, messages: [...tab.messages, helpMessage] }
+                : tab
+            )
+          );
+        }
+        break;
+      }
+
+      case '/roll': {
+        const min = 1;
+        const max = 100;
+        const rollResult = Math.floor(Math.random() * (max - min + 1)) + min;
+        
+        const rollMessage = {
+          id: `roll_${Date.now()}_${user?.username}`,
+          sender: 'System',
+          content: `🎲 ${user?.username} rolled: ${rollResult} (1-100)`,
+          timestamp: new Date(),
+          roomId: currentRoomId,
+          role: 'system',
+          level: 1,
+          type: 'roll'
+        };
+        
+        // Add locally and emit to server
+        setChatTabs(prevTabs =>
+          prevTabs.map(tab => 
+            tab.id === currentRoomId
+              ? { ...tab, messages: [...tab.messages, rollMessage] }
+              : tab
+          )
+        );
+        
+        socket?.emit('sendMessage', {
+          roomId: currentRoomId,
+          sender: 'System',
+          content: `🎲 ${user?.username} rolled: ${rollResult} (1-100)`,
+          role: 'system',
+          level: 1,
+          type: 'roll'
+        });
+        break;
+      }
+
+      case '/gift': {
+        if (args.length >= 2) {
+          const targetUsername = args[0];
+          const giftItem = args.slice(1).join(' ');
+          
+          const targetUser = participants.find(p => p.username.toLowerCase() === targetUsername.toLowerCase());
+          
+          if (targetUser) {
+            const giftMessage = {
+              id: `gift_cmd_${Date.now()}_${user?.username}`,
+              sender: 'System',
+              content: `🎁 ${user?.username} sent ${giftItem} to ${targetUsername}`,
+              timestamp: new Date(),
+              roomId: currentRoomId,
+              role: 'system',
+              level: 1,
+              type: 'gift'
+            };
+            
+            // Add locally and emit to server
+            setChatTabs(prevTabs =>
+              prevTabs.map(tab => 
+                tab.id === currentRoomId
+                  ? { ...tab, messages: [...tab.messages, giftMessage] }
+                  : tab
+              )
+            );
+            
+            socket?.emit('sendMessage', {
+              roomId: currentRoomId,
+              sender: 'System',
+              content: `🎁 ${user?.username} sent ${giftItem} to ${targetUsername}`,
+              role: 'system',
+              level: 1,
+              type: 'gift'
+            });
+          } else {
+            const errorMessage = {
+              id: `error_${Date.now()}_${user?.username}`,
+              sender: 'System',
+              content: `❌ User '${targetUsername}' not found in this room.`,
+              timestamp: new Date(),
+              roomId: currentRoomId,
+              role: 'system',
+              level: 1,
+              type: 'error'
+            };
+            
+            setChatTabs(prevTabs =>
+              prevTabs.map(tab => 
+                tab.id === currentRoomId
+                  ? { ...tab, messages: [...tab.messages, errorMessage] }
+                  : tab
+              )
+            );
+          }
+        } else {
+          const helpMessage = {
+            id: `help_${Date.now()}_${user?.username}`,
+            sender: 'System',
+            content: '❌ Usage: /gift [username] [item]',
+            timestamp: new Date(),
+            roomId: currentRoomId,
+            role: 'system',
+            level: 1,
+            type: 'error'
+          };
+          
+          setChatTabs(prevTabs =>
+            prevTabs.map(tab => 
+              tab.id === currentRoomId
+                ? { ...tab, messages: [...tab.messages, helpMessage] }
+                : tab
+            )
+          );
+        }
+        break;
+      }
+
+      default: {
+        const unknownMessage = {
+          id: `unknown_${Date.now()}_${user?.username}`,
+          sender: 'System',
+          content: `❌ Unknown command: ${command}\n\nAvailable commands:\n/me [action] - Perform an action\n/whois [username] - Get user info\n/roll - Roll dice (1-100)\n/gift [username] [item] - Send gift`,
+          timestamp: new Date(),
+          roomId: currentRoomId,
+          role: 'system',
+          level: 1,
+          type: 'error'
+        };
+        
+        setChatTabs(prevTabs =>
+          prevTabs.map(tab => 
+            tab.id === currentRoomId
+              ? { ...tab, messages: [...tab.messages, unknownMessage] }
+              : tab
+          )
+        );
+        break;
+      }
+    }
+
+    // Auto-scroll after command
+    setTimeout(() => {
+      flatListRefs.current[currentRoomId]?.scrollToEnd({ animated: true });
+    }, 100);
+  };
+
   const handleSendMessage = () => {
     // Check if user is muted (only for rooms, not private chats)
     if (chatTabs[activeTab]?.type !== 'private' && mutedUsers.includes(user?.username || '')) {
@@ -592,6 +845,14 @@ export default function ChatScreen() {
       const currentTab = chatTabs[activeTab];
       const isPrivateChat = currentTab.type === 'private';
       const messageContent = message.trim();
+
+      // Handle special commands
+      if (messageContent.startsWith('/')) {
+        handleSpecialCommand(messageContent, currentRoomId);
+        setMessage('');
+        setShowUserTagMenu(false);
+        return;
+      }
 
       // Create optimistic message object
       const optimisticMessage = {
@@ -1122,6 +1383,26 @@ export default function ChatScreen() {
     // Filter out messages from blocked users
     if (blockedUsers.includes(item.sender)) {
       return null;
+    }
+
+    // Handle special command messages (me, roll, whois, gift commands, errors)
+    if (item.type === 'me' || item.type === 'roll' || item.type === 'whois' || item.type === 'error') {
+      return (
+        <TouchableOpacity 
+          style={styles.systemMessageContainer}
+          onLongPress={() => handleMessageLongPress(item)}
+        >
+          <Text style={[
+            styles.systemMessageText,
+            item.type === 'error' ? { color: '#FF6B35' } : { color: '#888' }
+          ]}>
+            {item.content}
+          </Text>
+          <Text style={styles.systemMessageTime}>
+            {formatTime(item.timestamp)}
+          </Text>
+        </TouchableOpacity>
+      );
     }
 
     // Handle join/leave messages
@@ -3916,5 +4197,36 @@ const styles = StyleSheet.create({
   mentionText: {
     color: '#8B5CF6',
     fontWeight: 'bold',
+  },
+
+  // Gift Message Styles
+  giftMessageContainer: {
+    marginBottom: 8,
+    paddingHorizontal: 8,
+  },
+  giftMessageBubble: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 12,
+    padding: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF69B4',
+  },
+  giftMessageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  giftMessageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  giftMessageInline: {
+    marginLeft: 8,
+    flex: 1,
+  },
+  giftInlineText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
   },
 });

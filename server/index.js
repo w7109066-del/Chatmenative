@@ -3806,6 +3806,9 @@ io.on('connection', (socket) => {
           return; // Don't broadcast as regular message
         }
 
+        // Don't save special command messages to database if they are system messages
+        const shouldSaveToDatabase = !['me', 'roll', 'gift', 'whois', 'error'].includes(type);
+
         // Check if this is a LowCard command
         if (lowCardBot && content && typeof content === 'string' && content.startsWith('!')) {
           console.log('Processing LowCard command:', content);
@@ -3833,13 +3836,16 @@ io.on('connection', (socket) => {
         console.log(`Message broadcasted immediately to room ${roomId} from ${sender}`);
 
         // Save to database asynchronously (don't wait for it to complete)
-        setImmediate(async () => {
-          try {
-            await saveChatMessage(roomId, sender, content, gift ? JSON.stringify(gift) : null, type, role, level, false);
-          } catch (dbError) {
-            console.error('Error saving message to database (async):', dbError);
-          }
-        });
+        // Only save certain message types to database
+        if (shouldSaveToDatabase) {
+          setImmediate(async () => {
+            try {
+              await saveChatMessage(roomId, sender, content, gift ? JSON.stringify(gift) : null, type, role, level, false);
+            } catch (dbError) {
+              console.error('Error saving message to database (async):', dbError);
+            }
+          });
+        }
 
         // If it's a gift, also broadcast the animation event
         if (type === 'gift' && gift) {
