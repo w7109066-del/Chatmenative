@@ -1096,18 +1096,16 @@ export default function ChatScreen() {
     // Regular message
     return (
       <View style={styles.messageContainer}>
-        <View style={styles.messageRow}>
-          <View style={styles.leftSection}>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
-            </View>
-            <Text style={[
-              styles.senderName,
-              { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
-            ]}>
-              {item.sender}:
-            </Text>
+        <View style={styles.messageHeaderRow}>
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
           </View>
+          <Text style={[
+            styles.senderName,
+            { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+          ]}>
+            {item.sender}:
+          </Text>
           <View style={styles.messageContentInline}>
             {renderMessageContent(item.content)}
           </View>
@@ -2520,18 +2518,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   messageContainer: {
-    marginBottom: 8,
+    marginBottom: 6,
     paddingHorizontal: 8,
   },
-  messageRow: {
+  messageHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 6,
   },
   messageBadgesRow: {
     flexDirection: 'row',
@@ -2543,7 +2541,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 5,
     paddingVertical: 1,
-    marginRight: 4,
+    marginRight: 3,
     minWidth: 30,
     alignItems: 'center',
   },
@@ -2567,28 +2565,30 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 4,
+    marginRight: 6,
   },
   messageTime: {
     fontSize: 11,
     color: '#999',
-    marginLeft: 8,
+    marginLeft: 6,
     alignSelf: 'flex-start',
-    marginTop: -2,
   },
   messageContentContainer: {
-    marginTop: 2,
+    marginTop: 0,
     paddingLeft: 0,
+    width: '100%',
   },
   messageContentInline: {
     flex: 1,
-    marginRight: 8,
+    marginRight: 6,
+    minWidth: 0,
   },
   messageContent: {
     fontSize: 14,
     color: '#333',
-    lineHeight: 20,
+    lineHeight: 18,
     textAlign: 'left',
+    flexWrap: 'wrap',
   },
   inlineEmojiImage: {
     width: 18,
