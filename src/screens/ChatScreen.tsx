@@ -100,12 +100,16 @@ export default function ChatScreen() {
     try {
       console.log('Joining specific room/chat:', roomId, roomName, type);
 
-      // Always create a fresh room entry to ensure proper state
-      // Remove existing room if present first
-      setChatTabs(prevTabs => prevTabs.filter(tab => tab.id !== roomId));
+      // Clear all existing tabs first to prevent conflicts
+      setChatTabs([]);
+      setParticipants([]);
+      setActiveTab(0);
       
-      // Small delay to ensure state is updated
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Clear any existing refs
+      flatListRefs.current = {};
+      
+      // Small delay to ensure state is fully cleared
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // For private chats, don't try to load messages from room API
       let messages = [];
@@ -897,7 +901,8 @@ export default function ChatScreen() {
   };
 
   const handleBackPress = () => {
-    navigation.goBack();
+    // Always navigate to Room screen instead of going back to Home
+    navigation.navigate('Room');
   };
 
   const handleEllipsisPress = () => {
@@ -933,14 +938,14 @@ export default function ChatScreen() {
         delete flatListRefs.current[currentRoomId];
       }
 
-      // Remove the tab from chatTabs
+      // Remove the tab from chatTabs and navigate to Room screen
       setChatTabs(prevTabs => {
         const newTabs = prevTabs.filter((_, index) => index !== currentActiveTab);
-
-        // Always reset to showing no active rooms when leaving
+        
+        // If no tabs left, navigate to Room screen
         if (newTabs.length === 0) {
           setTimeout(() => {
-            setActiveTab(0);
+            navigation.navigate('Room');
           }, 100);
         } else {
           // Set new active tab if there are remaining tabs
