@@ -109,16 +109,19 @@ export default function ChatScreen() {
     try {
       console.log('Joining specific room/chat:', roomId, roomName, type);
 
-      // Clear all existing tabs first to prevent conflicts
-      setChatTabs([]);
-      setParticipants([]);
-      setActiveTab(0);
-      
-      // Clear any existing refs
-      flatListRefs.current = {};
-      
-      // Small delay to ensure state is fully cleared
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Check if room already exists in tabs
+      const existingTabIndex = chatTabs.findIndex(tab => tab.id === roomId);
+      if (existingTabIndex !== -1) {
+        // Room already exists, just switch to it
+        setActiveTab(existingTabIndex);
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({
+            x: existingTabIndex * width,
+            animated: true
+          });
+        }
+        return;
+      }
 
       // For private chats, don't try to load messages from room API
       let messages = [];
@@ -178,22 +181,27 @@ export default function ChatScreen() {
           type: type || 'room',
           messages: messages,
           managedBy: type === 'private' ? targetUser?.username : (roomData?.managedBy || roomData?.createdBy || 'admin'),
-          description: roomDescription || (type === 'private' ? `Private chat with ${targetUser?.username}` : `${roomName} room`)
+          description: roomDescription || (type === 'private' ? `Private chat with ${targetUser?.username}` : `${roomName} room`),
+          moderators: roomData?.moderators || []
         };
 
       // Add the new tab and set it as active
       setChatTabs(prevTabs => {
         const newTabs = [...prevTabs, newTab];
-        // Always set the new room as active tab
+        // Set the new room as active tab
+        const newActiveTab = newTabs.length - 1;
+        setActiveTab(newActiveTab);
+        
+        // Scroll to the active tab after state update
         setTimeout(() => {
-          setActiveTab(newTabs.length - 1);
           if (scrollViewRef.current) {
             scrollViewRef.current.scrollTo({
-              x: (newTabs.length - 1) * width,
+              x: newActiveTab * width,
               animated: true
             });
           }
         }, 100);
+        
         return newTabs;
       });
 
@@ -413,11 +421,8 @@ export default function ChatScreen() {
 
       const rooms = JSON.parse(responseText);
 
-      // Always allow room loading when requested
-      if (roomId && roomName) {
-        // Clear existing tabs for clean state
-        setChatTabs([]);
-        
+      // Only load specific room if navigating from RoomScreen with specific roomId
+      if (roomId && roomName && !chatTabs.length) {
         // Find and load the specific room
         const targetRoom = rooms.find((room: any) => room.id.toString() === roomId.toString());
         
@@ -437,7 +442,8 @@ export default function ChatScreen() {
               type: targetRoom.type || 'room',
               messages: messages,
               managedBy: targetRoom.managed_by || targetRoom.createdBy || 'admin',
-              description: targetRoom.description || `${targetRoom.name} room`
+              description: targetRoom.description || `${targetRoom.name} room`,
+              moderators: targetRoom.moderators || []
             };
 
             setChatTabs([newTab]);
@@ -455,19 +461,14 @@ export default function ChatScreen() {
             }
           } catch (error) {
             console.error(`Error loading room ${targetRoom.id}:`, error);
-            setChatTabs([]);
           }
         } else {
           console.log(`Room ${roomId} not found in available rooms`);
-          setChatTabs([]);
         }
-      } else {
-        // If no specific room navigation, clear tabs
-        setChatTabs([]);
       }
+      // Don't clear existing tabs if user already has multiple tabs open
     } catch (error) {
       console.error('Error loading rooms:', error);
-      setChatTabs([]);
     }
   };
 
@@ -2255,7 +2256,7 @@ export default function ChatScreen() {
               }]}>
                 {chatTabs[activeTab].title}
               </Text>
-              <Text style={styles.currentlyText}> currently in the room: </Text>
+              <Text style={styles.currentlyText}> currently in the room </Text>
               {participants.length > 0 ? (
                 participants.map((participant, index) => (
                   <Text key={index}>
