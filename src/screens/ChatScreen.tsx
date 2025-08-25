@@ -92,6 +92,36 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const { user } = useAuth();
 
+  // Animated Level Badge Component
+  const AnimatedLevelBadge = ({ level }: { level: number }) => {
+    const blinkAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+      const startBlinking = () => {
+        Animated.sequence([
+          Animated.timing(blinkAnim, {
+            toValue: 0.3,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(blinkAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]).start(() => startBlinking());
+      };
+
+      startBlinking();
+    }, [blinkAnim]);
+
+    return (
+      <Animated.View style={[styles.levelBadgeContainer, { opacity: blinkAnim }]}>
+        <Text style={styles.levelBadgeText}>Lv.{level}</Text>
+      </Animated.View>
+    );
+  };
+
   // Get room data from navigation params
   const { roomId, roomName, roomDescription, autoFocusTab, type, targetUser } = route.params || {};
 
@@ -592,12 +622,12 @@ export default function ChatScreen() {
           const actionText = args.join(' ');
           const meMessage = {
             id: `me_${Date.now()}_${user?.username}`,
-            sender: 'System',
-            content: `* ${user?.username} ${actionText}`,
+            sender: user?.username || 'User',
+            content: `${actionText}`,
             timestamp: new Date(),
             roomId: currentRoomId,
-            role: 'system',
-            level: 1,
+            role: user?.role || 'user',
+            level: user?.level || 1,
             type: 'me'
           };
           
@@ -612,10 +642,10 @@ export default function ChatScreen() {
           
           socket?.emit('sendMessage', {
             roomId: currentRoomId,
-            sender: 'System',
-            content: `* ${user?.username} ${actionText}`,
-            role: 'system',
-            level: 1,
+            sender: user?.username || 'User',
+            content: `${actionText}`,
+            role: user?.role || 'user',
+            level: user?.level || 1,
             type: 'me'
           });
         }
@@ -1410,18 +1440,34 @@ export default function ChatScreen() {
     if (item.type === 'me' || item.type === 'roll' || item.type === 'whois' || item.type === 'error') {
       return (
         <TouchableOpacity 
-          style={styles.systemMessageContainer}
+          style={styles.commandMessageContainer}
           onLongPress={() => handleMessageLongPress(item)}
         >
-          <Text style={[
-            styles.systemMessageText,
-            item.type === 'error' ? { color: '#FF6B35' } : { color: '#888' }
-          ]}>
-            {item.content}
-          </Text>
-          <Text style={styles.systemMessageTime}>
-            {formatTime(item.timestamp)}
-          </Text>
+          {item.type === 'me' ? (
+            <View style={styles.commandMessageRow}>
+              <Text style={styles.commandMessageText}>
+                <Text style={styles.levelBadge}>Lv.{item.level || 1} </Text>
+                <Text style={[
+                  styles.senderName,
+                  { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+                ]}>
+                  {item.sender} 
+                </Text>
+                <Text style={styles.commandContentText}>{item.content}</Text>
+              </Text>
+              <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+            </View>
+          ) : (
+            <View style={styles.commandMessageRow}>
+              <Text style={[
+                styles.commandMessageText,
+                { color: '#8B4513' } // Coklat untuk semua command
+              ]}>
+                {item.content}
+              </Text>
+              <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       );
     }
@@ -1494,19 +1540,21 @@ export default function ChatScreen() {
         onLongPress={() => handleMessageLongPress(item)}
       >
         <View style={styles.messageRow}>
-          {/* Single Text with nested components for proper wrapping */}
-          <Text style={styles.messageText}>
-            <Text style={styles.levelBadge}>Lv.{item.level || 1} </Text>
-            <Text style={[
-              styles.senderName,
-              { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
-            ]}>
-              {item.sender}: 
+          {/* Level badge, username, and message content */}
+          <View style={styles.messageContentRow}>
+            <AnimatedLevelBadge level={item.level || 1} />
+            <Text style={styles.messageText}>
+              <Text style={[
+                styles.senderName,
+                { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+              ]}>
+                {item.sender}: 
+              </Text>
+              <Text style={styles.messageContent}>
+                {renderMessageContent(item.content)}
+              </Text>
             </Text>
-            <Text style={styles.messageContent}>
-              {renderMessageContent(item.content)}
-            </Text>
-          </Text>
+          </View>
 
           {/* Time */}
           <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
@@ -2929,6 +2977,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  '@keyframes blink': {
+    '0%, 50%': { opacity: 1 },
+    '51%, 100%': { opacity: 0.5 },
+  },
   chatContainer: {
     flex: 1,
   },
@@ -3163,21 +3215,49 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginVertical: 4,
   },
+  messageContentRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
   messageText: {
     flex: 1,
     fontSize: 14,
     lineHeight: 18,
     textAlignVertical: 'top',
+    marginLeft: 6,
+  },
+  levelBadgeContainer: {
+    backgroundColor: '#229c93',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 1,
+  },
+  levelBadgeText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
   },
   levelBadge: {
     backgroundColor: '#229c93',
     color: 'white',
-    fontSize: 10,
+    fontSize: 8,
     fontWeight: 'bold',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 8,
     overflow: 'hidden',
+    minWidth: 16,
+    height: 16,
+    textAlign: 'center',
+    textAlignVertical: 'center',
   },
   levelText: {
     fontSize: 10,
@@ -3637,6 +3717,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999',
     fontWeight: '400',
+  },
+  commandMessageContainer: {
+    marginBottom: 6,
+    paddingHorizontal: 8,
+    alignSelf: 'flex-start',
+  },
+  commandMessageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 4,
+  },
+  commandMessageText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#8B4513', // Warna coklat untuk command
+    lineHeight: 18,
+    textAlignVertical: 'top',
+  },
+  commandContentText: {
+    fontSize: 14,
+    color: '#8B4513', // Warna coklat untuk content
   },
   systemMessageContainer: {
     alignItems: 'center',
