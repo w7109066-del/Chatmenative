@@ -3721,21 +3721,30 @@ io.on('connection', (socket) => {
     socket.leave(roomId);
     console.log(`${username} left room ${roomId}`);
 
-    // Update participant status to offline
+    // Remove participant from room completely when they leave
     try {
       if (roomParticipants[roomId]) {
-        const participant = roomParticipants[roomId].find(p => p.username === username);
-        if (participant) {
-          participant.isOnline = false;
-          participant.lastSeen = new Date().toISOString();
+        // Remove participant from the array
+        roomParticipants[roomId] = roomParticipants[roomId].filter(p => p.username !== username);
+        
+        // Update room member count
+        const roomIndex = rooms.findIndex(r => r.id === roomId);
+        if (roomIndex !== -1) {
+          rooms[roomIndex].members = roomParticipants[roomId].length;
         }
+
+        console.log(`Participant ${username} removed from room ${roomId}. Remaining: ${roomParticipants[roomId].length}`);
 
         // Notify room about updated participant list
         io.to(roomId).emit('participants-updated', roomParticipants[roomId]);
       }
     } catch (error) {
-      console.error('Error updating participant on leave:', error);
+      console.error('Error removing participant on leave:', error);
     }
+
+    // Clear socket room info
+    socket.roomId = null;
+    socket.username = null;
 
     // Don't save leave message to database, just broadcast in memory
     const leaveMessage = {
@@ -3959,19 +3968,39 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.username || socket.id}`);
 
-    // Update participant status to offline if they were in a room
+    // Remove participant completely from room if they were in one (for clean reconnection)
     if (socket.roomId && socket.username) {
       try {
         if (roomParticipants[socket.roomId]) {
-          const participant = roomParticipants[socket.roomId].find(p => p.username === socket.username);
-          if (participant) {
-            participant.isOnline = false;
-            participant.lastSeen = new Date().toISOString();
-            io.to(socket.roomId).emit('participants-updated', roomParticipants[socket.roomId]);
+          // Remove participant from the array on disconnect
+          roomParticipants[socket.roomId] = roomParticipants[socket.roomId].filter(p => p.username !== socket.username);
+          
+          // Update room member count
+          const roomIndex = rooms.findIndex(r => r.id === socket.roomId);
+          if (roomIndex !== -1) {
+            rooms[roomIndex].members = roomParticipants[socket.roomId].length;
           }
+
+          console.log(`Participant ${socket.username} removed from room ${socket.roomId} on disconnect. Remaining: ${roomParticipants[socket.roomId].length}`);
+          
+          // Notify room about updated participant list
+          io.to(socket.roomId).emit('participants-updated', roomParticipants[socket.roomId]);
+
+          // Broadcast leave message
+          const leaveMessage = {
+            id: Date.now().toString(),
+            sender: socket.username,
+            content: `${socket.username} left the room`,
+            timestamp: new Date(),
+            roomId: socket.roomId,
+            type: 'leave',
+            userRole: socket.userRole || 'user'
+          };
+
+          socket.to(socket.roomId).emit('user-left', leaveMessage);
         }
       } catch (error) {
-        console.error('Error updating participant status on disconnect:', error);
+        console.error('Error removing participant on disconnect:', error);
       }
     }
 

@@ -111,6 +111,10 @@ export default function ChatScreen() {
             animated: true
           });
         }
+        // Reload participants for existing room
+        if (type !== 'private') {
+          await loadParticipants();
+        }
         return;
       }
 
@@ -911,14 +915,30 @@ export default function ChatScreen() {
     setShowPopupMenu(false);
 
     if (socket && chatTabs[activeTab] && user) {
+      const currentRoomId = chatTabs[activeTab].id;
+      const currentActiveTab = activeTab;
+
       // Leave the room via socket
       socket.emit('leave-room', {
-        roomId: chatTabs[activeTab].id,
+        roomId: currentRoomId,
         username: user.username || 'Guest',
         role: user.role || 'user'
       });
 
-      const currentActiveTab = activeTab;
+      // Clear participants for this room
+      setParticipants([]);
+      
+      // Clear unread count for this room
+      setUnreadCounts(prev => {
+        const newCounts = { ...prev };
+        delete newCounts[currentRoomId];
+        return newCounts;
+      });
+
+      // Clear flatListRef for this room
+      if (flatListRefs.current[currentRoomId]) {
+        delete flatListRefs.current[currentRoomId];
+      }
 
       // Remove the tab from chatTabs and clear messages
       setChatTabs(prevTabs => {
@@ -957,7 +977,8 @@ export default function ChatScreen() {
   const loadParticipants = async () => {
     try {
       if (chatTabs[activeTab]) {
-        const response = await fetch(`${API_BASE_URL}/api/rooms/${chatTabs[activeTab].id}/participants`, {
+        const currentRoomId = chatTabs[activeTab].id;
+        const response = await fetch(`${API_BASE_URL}/api/rooms/${currentRoomId}/participants`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -967,16 +988,22 @@ export default function ChatScreen() {
 
         if (response.ok) {
           const participantData = await response.json();
-          setParticipants(participantData);
-          console.log('Participants loaded:', participantData.length);
+          // Only update if we're still on the same room (prevent race conditions)
+          if (chatTabs[activeTab] && chatTabs[activeTab].id === currentRoomId) {
+            setParticipants(participantData);
+            setFilteredParticipants(participantData); // Update filtered list too
+            console.log('Participants loaded for room', currentRoomId, ':', participantData.length);
+          }
         } else {
-          console.error('Failed to load participants');
+          console.error('Failed to load participants for room', currentRoomId);
           setParticipants([]);
+          setFilteredParticipants([]);
         }
       }
     } catch (error) {
       console.error('Error loading participants:', error);
       setParticipants([]);
+      setFilteredParticipants([]);
     }
   };
 
