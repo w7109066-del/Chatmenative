@@ -1466,8 +1466,8 @@ export default function ChatScreen() {
         onLongPress={() => handleMessageLongPress(item)}
       >
         <View style={styles.messageRow}>
-          {/* Badge + Username + Message */}
-          <Text style={styles.messagePrefixText}>
+          {/* Single Text with nested components for proper wrapping */}
+          <Text style={styles.messageText}>
             <Text style={styles.levelBadge}>Lv.{item.level || 1} </Text>
             <Text style={[
               styles.senderName,
@@ -1475,11 +1475,9 @@ export default function ChatScreen() {
             ]}>
               {item.sender}: 
             </Text>
-          </Text>
-          
-          {/* Message Content */}
-          <Text style={styles.messageContentText}>
-            {renderMessageContent(item.content)}
+            <Text style={styles.messageContent}>
+              {renderMessageContent(item.content)}
+            </Text>
           </Text>
 
           {/* Time */}
@@ -3137,8 +3135,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginVertical: 4,
   },
-  messagePrefixText: {
-    flexShrink: 0,
+  messageText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 18,
+    textAlignVertical: 'top',
   },
   levelBadge: {
     backgroundColor: '#229c93',
@@ -3177,28 +3178,9 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     alignSelf: 'flex-start',
   },
-  messageContentContainer: {
-    marginTop: 0,
-    paddingLeft: 0,
-    width: '100%',
-  },
-  messageContentInline: {
-    flex: 1,
-    marginRight: 6,
-    minWidth: 0,
-  },
-  messageContentText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 18,
-  },
   messageContent: {
     fontSize: 14,
     color: '#333',
-    lineHeight: 18,
-    textAlign: 'left',
-    flexWrap: 'wrap',
   },
   inlineEmojiImage: {
     width: 18,
