@@ -1,6 +1,6 @@
 modules = ["nodejs-20"]
 [nix]
-packages = ["nodejs-18_x"]
+packages = ["nodejs-18_x", "eas-cli"]
 channel = "stable-25_05"
 
 [workflows]

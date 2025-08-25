@@ -27,9 +27,9 @@ const getApiUrl = () => {
     if (currentHost && currentHost.includes('replit.dev')) {
       return `${protocol}//${currentHost.replace(':3000', ':5000')}`;
     }
-    return 'https://6f78a39c-dae9-42ae-bed4-1a98a4d51ca0-00-36d746w25elda.pike.replit.dev:5000';
+    return 'https://01b6d1c3-d54e-4850-9198-08ef6ebc9b67-00-2dzywtte8ryaz.sisko.replit.dev:5000';
   }
-  return 'https://6f78a39c-dae9-42ae-bed4-1a98a4d51ca0-00-36d746w25elda.pike.replit.dev';
+  return 'https://01b6d1c3-d54e-4850-9198-08ef6ebc9b67-00-2dzywtte8ryaz.sisko.replit.dev';
 };
 
 const API_BASE_URL = getApiUrl();
