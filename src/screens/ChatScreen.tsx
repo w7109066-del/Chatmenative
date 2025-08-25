@@ -1417,7 +1417,7 @@ export default function ChatScreen() {
       };
 
       const actionText = item.type === 'join' ? 'has entered' : 'has left';
-      const formattedMessage = `[${roomName}] {${username}} ${getRoleBadgeText(userRole)} ${actionText}`;
+      const roomColor = getRoleColor(userRole, username, chatTabs[activeTab]?.id);
 
       return (
         <TouchableOpacity 
@@ -1425,10 +1425,11 @@ export default function ChatScreen() {
           onLongPress={() => handleMessageLongPress(item)}
         >
           <Text style={styles.joinLeaveMessageText}>
-            {formattedMessage}
-          </Text>
-          <Text style={styles.joinLeaveMessageTime}>
-            {formatTime(item.timestamp)}
+            <Text style={[styles.roomNameText, { color: roomColor }]}>{roomName} </Text>
+            <Text style={[styles.usernameText, { color: getRoleColor(userRole, username, chatTabs[activeTab]?.id) }]}>{username} </Text>
+            <Text style={styles.roleBadgeText}>{getRoleBadgeText(userRole)} </Text>
+            <Text style={styles.actionText}>{actionText} </Text>
+            <Text style={styles.joinLeaveTime}>({formatTime(item.timestamp)})</Text>
           </Text>
         </TouchableOpacity>
       );
@@ -3586,12 +3587,29 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
     textAlign: 'left',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  joinLeaveMessageTime: {
-    fontSize: 10,
+  roomNameText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  usernameText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  roleBadgeText: {
+    fontSize: 13,
+  },
+  actionText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  joinLeaveTime: {
+    fontSize: 11,
     color: '#999',
-    textAlign: 'left',
-    marginTop: 2,
+    fontWeight: '400',
   },
   systemMessageContainer: {
     alignItems: 'center',
