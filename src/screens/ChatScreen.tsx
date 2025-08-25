@@ -100,23 +100,12 @@ export default function ChatScreen() {
     try {
       console.log('Joining specific room/chat:', roomId, roomName, type);
 
-      // Check if room is already in chatTabs
-      const existingTabIndex = chatTabs.findIndex(tab => tab.id === roomId);
-      if (existingTabIndex !== -1) {
-        // Room already exists, just switch to it
-        setActiveTab(existingTabIndex);
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollTo({
-            x: existingTabIndex * width,
-            animated: true
-          });
-        }
-        // Reload participants for existing room
-        if (type !== 'private') {
-          await loadParticipants();
-        }
-        return;
-      }
+      // Always create a fresh room entry to ensure proper state
+      // Remove existing room if present first
+      setChatTabs(prevTabs => prevTabs.filter(tab => tab.id !== roomId));
+      
+      // Small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // For private chats, don't try to load messages from room API
       let messages = [];
@@ -179,15 +168,19 @@ export default function ChatScreen() {
           description: roomDescription || (type === 'private' ? `Private chat with ${targetUser?.username}` : `${roomName} room`)
         };
 
-      // Add the new tab
+      // Add the new tab and set it as active
       setChatTabs(prevTabs => {
         const newTabs = [...prevTabs, newTab];
-        // Only set active tab if this is the first tab or explicitly requested
-        if (newTabs.length === 1) {
-          setTimeout(() => {
-            setActiveTab(0);
-          }, 100);
-        }
+        // Always set the new room as active tab
+        setTimeout(() => {
+          setActiveTab(newTabs.length - 1);
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({
+              x: (newTabs.length - 1) * width,
+              animated: true
+            });
+          }
+        }, 100);
         return newTabs;
       });
 
@@ -407,61 +400,61 @@ export default function ChatScreen() {
 
       const rooms = JSON.parse(responseText);
 
-      // Don't automatically load all rooms - only load if specifically navigated from RoomScreen
+      // Always allow room loading when requested
       if (roomId && roomName) {
-        // Only load the specific room that user wants to join
-        const tabs: ChatTab[] = await Promise.all(
-          rooms.filter((room: any) => room.id === roomId).map(async (room: any) => {
-            try {
-              const messagesResponse = await fetch(`${API_BASE_URL}/api/messages/${room.id}`, {
-                headers: {
-                  'Content-Type': 'application/json',
-                  'User-Agent': 'ChatMe-Mobile-App',
-                },
+        // Clear existing tabs for clean state
+        setChatTabs([]);
+        
+        // Find and load the specific room
+        const targetRoom = rooms.find((room: any) => room.id.toString() === roomId.toString());
+        
+        if (targetRoom) {
+          try {
+            const messagesResponse = await fetch(`${API_BASE_URL}/api/messages/${targetRoom.id}`, {
+              headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'ChatMe-Mobile-App',
+              },
+            });
+            const messages = messagesResponse.ok ? await messagesResponse.json() : [];
+
+            const newTab: ChatTab = {
+              id: targetRoom.id.toString(),
+              title: targetRoom.name,
+              type: targetRoom.type || 'room',
+              messages: messages,
+              managedBy: targetRoom.managed_by || targetRoom.createdBy || 'admin',
+              description: targetRoom.description || `${targetRoom.name} room`
+            };
+
+            setChatTabs([newTab]);
+            setActiveTab(0);
+
+            // Add participant and join room
+            if (user?.username) {
+              await addParticipantToRoom(targetRoom.id.toString(), user.username, user.role || 'user');
+
+              socket?.emit('join-room', {
+                roomId: targetRoom.id.toString(),
+                username: user?.username || 'Guest',
+                role: user?.role || 'user'
               });
-              const messages = messagesResponse.ok ? await messagesResponse.json() : [];
-
-              return {
-                id: room.id,
-                title: room.name,
-                type: room.type || 'room',
-                messages: messages,
-                managedBy: room.managedBy || room.createdBy || 'admin',
-                description: room.description || `${room.name} room`
-              };
-            } catch (error) {
-              console.error(`Error loading messages for room ${room.id}:`, error);
-              return {
-                id: room.id,
-                title: room.name,
-                type: room.type || 'room',
-                messages: []
-              };
             }
-          })
-        );
-
-        setChatTabs(tabs);
-
-        // Only join the specific room
-        if (tabs.length > 0 && user?.username) {
-          const room = tabs[0];
-          await addParticipantToRoom(room.id, user.username, user.role || 'user');
-
-          socket?.emit('join-room', {
-            roomId: room.id,
-            username: user?.username || 'Guest',
-            role: user?.role || 'user'
-          });
+          } catch (error) {
+            console.error(`Error loading room ${targetRoom.id}:`, error);
+            setChatTabs([]);
+          }
+        } else {
+          console.log(`Room ${roomId} not found in available rooms`);
+          setChatTabs([]);
         }
-
-        setActiveTab(0);
       } else {
-        // If no specific room navigation, don't load any tabs
+        // If no specific room navigation, clear tabs
         setChatTabs([]);
       }
     } catch (error) {
       console.error('Error loading rooms:', error);
+      setChatTabs([]);
     }
   };
 
@@ -940,27 +933,29 @@ export default function ChatScreen() {
         delete flatListRefs.current[currentRoomId];
       }
 
-      // Remove the tab from chatTabs and clear messages
+      // Remove the tab from chatTabs
       setChatTabs(prevTabs => {
         const newTabs = prevTabs.filter((_, index) => index !== currentActiveTab);
 
-        // Adjust active tab after removal
+        // Always reset to showing no active rooms when leaving
         if (newTabs.length === 0) {
-          // If no more tabs, set activeTab to 0 but don't navigate back
-          // This allows users to join new rooms
-          setTimeout(() => setActiveTab(0), 100);
+          setTimeout(() => {
+            setActiveTab(0);
+          }, 100);
         } else {
-          // Set new active tab
+          // Set new active tab if there are remaining tabs
           const newActiveTab = currentActiveTab >= newTabs.length
             ? newTabs.length - 1
             : currentActiveTab;
 
           setTimeout(() => {
             setActiveTab(newActiveTab);
-            scrollViewRef.current?.scrollTo({
-              x: newActiveTab * width,
-              animated: true
-            });
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollTo({
+                x: newActiveTab * width,
+                animated: true
+              });
+            }
           }, 100);
         }
 
