@@ -1333,50 +1333,44 @@ export default function ChatScreen() {
     // Split content by @ mentions and style them
     const parts = content.split(/(@\w+)/g);
     
-    return (
-      <View style={styles.messageContentContainer}>
-        <Text style={styles.messageContent} numberOfLines={0}>
-          {parts.map((part, index) => {
-            if (part.startsWith('@')) {
-              // Style @ mentions
-              return (
-                <Text key={index} style={styles.mentionText}>
-                  {part}
-                </Text>
-              );
-            } else if (part.startsWith('<img:') && part.endsWith('>')) {
-              // Extract server image URL
-              const imageUrl = part.slice(5, -1);
-              return (
-                <Text key={index}>
-                  <Image
-                    source={{ uri: `${API_BASE_URL}${imageUrl}` }}
-                    style={styles.inlineEmojiImage}
-                    resizeMode="contain"
-                  />
-                </Text>
-              );
-            } else if (part.startsWith('<localimg:') && part.endsWith('>')) {
-              // Extract local image name
-              const imageName = part.slice(10, -1);
-              const localImageSource = localEmoticonsMap[imageName];
-              if (localImageSource) {
-                return (
-                  <Text key={index}>
-                    <Image
-                      source={localImageSource}
-                      style={styles.inlineEmojiImage}
-                      resizeMode="contain"
-                    />
-                  </Text>
-                );
-              }
-            }
-            return part;
-          })}
-        </Text>
-      </View>
-    );
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        // Style @ mentions
+        return (
+          <Text key={index} style={styles.mentionText}>
+            {part}
+          </Text>
+        );
+      } else if (part.startsWith('<img:') && part.endsWith('>')) {
+        // Extract server image URL
+        const imageUrl = part.slice(5, -1);
+        return (
+          <Text key={index}>
+            <Image
+              source={{ uri: `${API_BASE_URL}${imageUrl}` }}
+              style={styles.inlineEmojiImage}
+              resizeMode="contain"
+            />
+          </Text>
+        );
+      } else if (part.startsWith('<localimg:') && part.endsWith('>')) {
+        // Extract local image name
+        const imageName = part.slice(10, -1);
+        const localImageSource = localEmoticonsMap[imageName];
+        if (localImageSource) {
+          return (
+            <Text key={index}>
+              <Image
+                source={localImageSource}
+                style={styles.inlineEmojiImage}
+                resizeMode="contain"
+              />
+            </Text>
+          );
+        }
+      }
+      return part;
+    });
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -1471,19 +1465,24 @@ export default function ChatScreen() {
         style={styles.messageContainer}
         onLongPress={() => handleMessageLongPress(item)}
       >
-        <View style={styles.messageHeaderRow}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>Lv.{item.level || 1}</Text>
-          </View>
-          <Text style={[
-            styles.senderName,
-            { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
-          ]}>
-            {item.sender}:
+        <View style={styles.messageRow}>
+          {/* Badge + Username + Message */}
+          <Text style={styles.messagePrefixText}>
+            <Text style={styles.levelBadge}>Lv.{item.level || 1} </Text>
+            <Text style={[
+              styles.senderName,
+              { color: getRoleColor(item.role, item.sender, chatTabs[activeTab]?.id) }
+            ]}>
+              {item.sender}: 
+            </Text>
           </Text>
-          <View style={styles.messageContentInline}>
+          
+          {/* Message Content */}
+          <Text style={styles.messageContentText}>
             {renderMessageContent(item.content)}
-          </View>
+          </Text>
+
+          {/* Time */}
           <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
         </View>
       </TouchableOpacity>
@@ -3133,29 +3132,23 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     paddingHorizontal: 8,
   },
-  messageHeaderRow: {
+  messageRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    flexWrap: 'wrap',
+    marginVertical: 4,
   },
-  leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 6,
-  },
-  messageBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'nowrap',
+  messagePrefixText: {
+    flexShrink: 0,
   },
   levelBadge: {
     backgroundColor: '#229c93',
-    borderRadius: 10,
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
     paddingHorizontal: 5,
     paddingVertical: 1,
-    marginRight: 3,
-    minWidth: 30,
-    alignItems: 'center',
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   levelText: {
     fontSize: 10,
@@ -3177,7 +3170,6 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 6,
   },
   messageTime: {
     fontSize: 11,
@@ -3194,6 +3186,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 6,
     minWidth: 0,
+  },
+  messageContentText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 18,
   },
   messageContent: {
     fontSize: 14,
