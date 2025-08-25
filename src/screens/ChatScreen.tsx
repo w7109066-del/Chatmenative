@@ -499,7 +499,7 @@ export default function ChatScreen() {
     switch (role) {
       case 'user': return '#2196F3'; // Blue
       case 'merchant': return '#9C27B0'; // Purple
-      case 'mentor': return '#FF5722'; // Deep Orange
+      case 'mentor': return '#eb0e0e'; // Deep Orange
       default: return '#2196F3'; // Default to blue
     }
   };
