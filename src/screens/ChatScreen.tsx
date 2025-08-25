@@ -92,33 +92,12 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const { user } = useAuth();
 
-  // Animated Level Badge Component
-  const AnimatedLevelBadge = ({ level }: { level: number }) => {
-    const blinkAnim = useRef(new Animated.Value(1)).current;
-
-    useEffect(() => {
-      const startBlinking = () => {
-        Animated.sequence([
-          Animated.timing(blinkAnim, {
-            toValue: 0.3,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(blinkAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ]).start(() => startBlinking());
-      };
-
-      startBlinking();
-    }, [blinkAnim]);
-
+  // Static Level Badge Component (no blinking)
+  const LevelBadge = ({ level }: { level: number }) => {
     return (
-      <Animated.View style={[styles.levelBadgeContainer, { opacity: blinkAnim }]}>
+      <View style={styles.levelBadgeContainer}>
         <Text style={styles.levelBadgeText}>Lv.{level}</Text>
-      </Animated.View>
+      </View>
     );
   };
 
@@ -835,11 +814,100 @@ export default function ChatScreen() {
         break;
       }
 
+      case '/lock': {
+        // Check if user has permission to lock room
+        const currentRoom = chatTabs.find(tab => tab.id === currentRoomId);
+        const isOwner = currentRoom && currentRoom.managedBy === user?.username;
+        const isModerator = currentRoom && currentRoom.moderators && currentRoom.moderators.includes(user?.username);
+        const isAdmin = user?.role === 'admin';
+
+        if (!isOwner && !isModerator && !isAdmin) {
+          const errorMessage = {
+            id: `error_${Date.now()}_${user?.username}`,
+            sender: 'System',
+            content: '❌ Only room owner, moderators, or admins can lock the room.',
+            timestamp: new Date(),
+            roomId: currentRoomId,
+            role: 'system',
+            level: 1,
+            type: 'error'
+          };
+          
+          setChatTabs(prevTabs =>
+            prevTabs.map(tab => 
+              tab.id === currentRoomId
+                ? { ...tab, messages: [...tab.messages, errorMessage] }
+                : tab
+            )
+          );
+          break;
+        }
+
+        if (args.length > 0) {
+          const password = args.join(' ');
+          
+          // Emit lock room command to server
+          socket?.emit('lock-room', {
+            roomId: currentRoomId,
+            password: password,
+            lockedBy: user?.username
+          });
+
+          const lockMessage = {
+            id: `lock_${Date.now()}_${user?.username}`,
+            sender: 'System',
+            content: `🔒 Room has been locked by ${user?.username}. New users will need a password to enter.`,
+            timestamp: new Date(),
+            roomId: currentRoomId,
+            role: 'system',
+            level: 1,
+            type: 'lock'
+          };
+          
+          setChatTabs(prevTabs =>
+            prevTabs.map(tab => 
+              tab.id === currentRoomId
+                ? { ...tab, messages: [...tab.messages, lockMessage] }
+                : tab
+            )
+          );
+
+          socket?.emit('sendMessage', {
+            roomId: currentRoomId,
+            sender: 'System',
+            content: `🔒 Room has been locked by ${user?.username}. New users will need a password to enter.`,
+            role: 'system',
+            level: 1,
+            type: 'lock'
+          });
+        } else {
+          const helpMessage = {
+            id: `help_${Date.now()}_${user?.username}`,
+            sender: 'System',
+            content: '❌ Usage: /lock [password]',
+            timestamp: new Date(),
+            roomId: currentRoomId,
+            role: 'system',
+            level: 1,
+            type: 'error'
+          };
+          
+          setChatTabs(prevTabs =>
+            prevTabs.map(tab => 
+              tab.id === currentRoomId
+                ? { ...tab, messages: [...tab.messages, helpMessage] }
+                : tab
+            )
+          );
+        }
+        break;
+      }
+
       default: {
         const unknownMessage = {
           id: `unknown_${Date.now()}_${user?.username}`,
           sender: 'System',
-          content: `❌ Unknown command: ${command}\n\nAvailable commands:\n/me [action] - Perform an action\n/whois [username] - Get user info\n/roll - Roll dice (1-100)\n/gift [username] [item] - Send gift`,
+          content: `❌ Unknown command: ${command}\n\nAvailable commands:\n/me [action] - Perform an action\n/whois [username] - Get user info\n/roll - Roll dice (1-100)\n/gift [username] [item] - Send gift\n/lock [password] - Lock room (moderator/owner/admin only)`,
           timestamp: new Date(),
           roomId: currentRoomId,
           role: 'system',
@@ -1542,7 +1610,7 @@ export default function ChatScreen() {
         <View style={styles.messageRow}>
           {/* Level badge, username, and message content */}
           <View style={styles.messageContentRow}>
-            <AnimatedLevelBadge level={item.level || 1} />
+            <LevelBadge level={item.level || 1} />
             <Text style={styles.messageText}>
               <Text style={[
                 styles.senderName,
@@ -2178,6 +2246,33 @@ export default function ChatScreen() {
           <Text style={styles.managedByText}>
             <Text style={styles.roomNameHighlight}>{chatTabs[activeTab].title}</Text> This room is managed by {chatTabs[activeTab]?.managedBy || 'admin'}
           </Text>
+          
+          {/* Currently in the room section */}
+          <View style={styles.currentlyInRoomContainer}>
+            <Text style={styles.currentlyInRoomText}>
+              <Text style={[styles.roomNameHighlight, { 
+                color: getRoleColor(user?.role, user?.username, chatTabs[activeTab]?.id) 
+              }]}>
+                {chatTabs[activeTab].title}
+              </Text>
+              <Text style={styles.currentlyText}> currently in the room: </Text>
+              {participants.length > 0 ? (
+                participants.map((participant, index) => (
+                  <Text key={index}>
+                    <Text style={[
+                      styles.participantInRoomName,
+                      { color: getRoleColor(participant.role, participant.username, chatTabs[activeTab]?.id) }
+                    ]}>
+                      {participant.username}
+                    </Text>
+                    {index < participants.length - 1 && <Text style={styles.participantSeparator}>, </Text>}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.noParticipantsInRoom}>No users currently in the room</Text>
+              )}
+            </Text>
+          </View>
         </View>
       )}
 
@@ -3191,6 +3286,34 @@ const styles = StyleSheet.create({
   roomNameHighlight: {
     color: '#d6510f',
     fontWeight: 'bold',
+  },
+  currentlyInRoomContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  currentlyInRoomText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+  },
+  currentlyText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  participantInRoomName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  participantSeparator: {
+    fontSize: 13,
+    color: '#666',
+  },
+  noParticipantsInRoom: {
+    fontSize: 13,
+    color: '#999',
+    fontStyle: 'italic',
   },
   tabContainer: {
     flex: 1,
